@@ -3,23 +3,18 @@ package fresher
 import (
 	"fmt"
 	"io/ioutil"
-	"path/filepath"
 	"time"
 
 	yaml "github.com/goccy/go-yaml"
 )
 
-type buildPath struct {
-	Dir  string `yaml:"dir"`
-	File string `yaml:"file"`
-}
-
-func (b *buildPath) Path() string {
-	return filepath.Join(b.Dir, b.File)
+type Command struct {
+	Name string   `yaml:"name"`
+	Args []string `yaml:"args"`
 }
 
 type Config struct {
-	BuildPath   *buildPath      `yaml:"build"`
+	Command     *Command        `yaml:"command"`
 	Paths       []*RecursiveDir `yaml:"path"`
 	ExcludePath *GlobalExclude  `yaml:"exclude"`
 	Extensions  []string        `yaml:"extension"`
@@ -43,8 +38,8 @@ func (c *Config) Options() []OptionFunc {
 		return nil
 	}
 	var funcs []OptionFunc
-	if c.BuildPath != nil {
-		funcs = append(funcs, BuildPath(c.BuildPath.Path()))
+	if c.Command != nil {
+		funcs = append(funcs, ExecCommand(c.Command))
 	}
 	if len(c.Paths) > 0 {
 		funcs = append(funcs, WatchPaths(c.Paths))

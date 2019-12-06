@@ -12,7 +12,7 @@ import (
 )
 
 type Option struct {
-	buildPath     string
+	command       *Command
 	paths         []*RecursiveDir
 	globalExclude *GlobalExclude
 	exts          []string
@@ -21,7 +21,10 @@ type Option struct {
 
 func defaultOption() *Option {
 	return &Option{
-		buildPath: "main.go",
+		command: &Command{
+			Name: "go",
+			Args: []string{"version"},
+		},
 		paths: []*RecursiveDir{
 			{
 				Name: ".",
@@ -67,10 +70,6 @@ func (f *Fresher) Watch() error {
 	go f.publish(watcher)
 	go f.subscribe()
 
-	if err := watcher.Add(f.opt.buildPath); err != nil {
-		return err
-	}
-
 	for _, path := range f.opt.paths {
 		if err := path.Walk(watcher, f.opt.globalExclude); err != nil {
 			return err
@@ -99,7 +98,7 @@ func (f *Fresher) publish(watcher *fsnotify.Watcher) {
 }
 
 func (f *Fresher) buildCMD() error {
-	cmd := exec.Command("go", "run", f.opt.buildPath)
+	cmd := exec.Command(f.opt.command.Name, f.opt.command.Args...)
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
 		return err

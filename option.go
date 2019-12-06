@@ -4,9 +4,9 @@ import "time"
 
 type OptionFunc func(f *Fresher)
 
-func BuildPath(buildPath string) OptionFunc {
+func ExecCommand(command *Command) OptionFunc {
 	return func(f *Fresher) {
-		f.opt.buildPath = buildPath
+		f.opt.command = command
 	}
 }
 
