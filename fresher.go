@@ -15,7 +15,7 @@ type Option struct {
 	command       *Command
 	paths         []*RecursiveDir
 	globalExclude *GlobalExclude
-	exts          []string
+	exts          Extentions
 	interval      time.Duration
 }
 
@@ -30,6 +30,7 @@ func defaultOption() *Option {
 				Name: ".",
 			},
 		},
+		exts:     Extentions{"go"},
 		interval: time.Second * 3,
 	}
 }
@@ -71,7 +72,7 @@ func (f *Fresher) Watch() error {
 	go f.subscribe()
 
 	for _, path := range f.opt.paths {
-		if err := path.Walk(watcher, f.opt.globalExclude); err != nil {
+		if err := path.Walk(watcher, f.opt); err != nil {
 			return err
 		}
 	}

@@ -1,12 +1,24 @@
 package fresher
 
 import (
+	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/fsnotify/fsnotify"
 )
 
-// TODO: support regexp
+type Extentions []string
+
+func (e Extentions) IsIncludeSameExt(fileName string) bool {
+	for _, ext := range e {
+		if fmt.Sprintf(".%s", ext) == filepath.Ext(fileName) {
+			return true
+		}
+	}
+	return false
+}
+
 type GlobalExclude struct {
 	Files []string `json:"file"`
 	Dirs  []string `json:"dir"`
@@ -36,7 +48,6 @@ func (g *GlobalExclude) IsExcludeFile(fileName string) (bool, error) {
 
 type RecursiveDir struct {
 	Name         string          `yaml:"name"`
-	Files        []string        `yaml:"file"`
 	ExcludeFiles []string        `yaml:"exclude"`
 	Dirs         []*RecursiveDir `yaml:"dir"`
 }
@@ -54,47 +65,55 @@ func (r *RecursiveDir) IsExcludeFile(fileName string) (bool, error) {
 	return false, nil
 }
 
-func (r *RecursiveDir) WalkWithDirName(watcher *fsnotify.Watcher, global *GlobalExclude, dirName string) error {
+func (r *RecursiveDir) WalkWithDirName(watcher *fsnotify.Watcher, opt *Option, dirName string) error {
+	global := opt.globalExclude
 	if global.IsExcludeDir(r.Name) {
 		return nil
 	}
-	// Ignored global exclude files
-	if len(r.Files) == 0 && len(r.ExcludeFiles) == 0 {
-		if err := watcher.Add(filepath.Join(dirName, r.Name)); err != nil {
+	if err := filepath.Walk(filepath.Join(dirName, r.Name), func(path string, info os.FileInfo, err error) error {
+		if err != nil && err != filepath.SkipDir {
 			return err
 		}
-	} else {
-		for _, file := range r.Files {
-			isGlobalExclude, err := global.IsExcludeFile(file)
-			if err != nil {
-				return err
-			}
-			if isGlobalExclude {
-				continue
-			}
-			isExclude, err := r.IsExcludeFile(file)
-			if err != nil {
-				return err
-			}
-			if isExclude {
-				continue
-			}
-			if err := watcher.Add(filepath.Join(dirName, r.Name, file)); err != nil {
-				return err
-			}
+		if info.IsDir() && info.Name() != r.Name {
+			return filepath.SkipDir
 		}
+
+		isGlobalExclude, err := global.IsExcludeFile(info.Name())
+		if err != nil {
+			return err
+		}
+		if isGlobalExclude {
+			return nil
+		}
+		isExclude, err := r.IsExcludeFile(info.Name())
+		if err != nil {
+			return err
+		}
+		if isExclude {
+			return nil
+		}
+		if !opt.exts.IsIncludeSameExt(path) {
+			return nil
+		}
+		fmt.Println("Wathed File:", path)
+		if err := watcher.Add(path); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		return err
 	}
 
 	for _, dir := range r.Dirs {
-		if err := dir.WalkWithDirName(watcher, global, filepath.Join(dirName, r.Name)); err != nil {
+		if err := dir.WalkWithDirName(watcher, opt, filepath.Join(dirName, r.Name)); err != nil {
 			return err
 		}
 	}
 	return nil
 
 }
-func (r *RecursiveDir) Walk(watcher *fsnotify.Watcher, global *GlobalExclude) error {
-	if err := r.WalkWithDirName(watcher, global, "."); err != nil {
+func (r *RecursiveDir) Walk(watcher *fsnotify.Watcher, opt *Option) error {
+	if err := r.WalkWithDirName(watcher, opt, "."); err != nil {
 		return err
 	}
 	return nil

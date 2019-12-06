@@ -1,6 +1,8 @@
 package fresher
 
-import "time"
+import (
+	"time"
+)
 
 type OptionFunc func(f *Fresher)
 
@@ -22,7 +24,7 @@ func GlobalExcludePath(global *GlobalExclude) OptionFunc {
 	}
 }
 
-func Extensions(exts []string) OptionFunc {
+func Extensions(exts Extentions) OptionFunc {
 	return func(f *Fresher) {
 		f.opt.exts = exts
 	}

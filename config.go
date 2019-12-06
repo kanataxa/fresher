@@ -17,7 +17,7 @@ type Config struct {
 	Command     *Command        `yaml:"command"`
 	Paths       []*RecursiveDir `yaml:"path"`
 	ExcludePath *GlobalExclude  `yaml:"exclude"`
-	Extensions  []string        `yaml:"extension"`
+	Extensions  Extentions      `yaml:"extension"`
 	Interval    time.Duration   `yaml:"interval"`
 }
 
