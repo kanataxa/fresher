@@ -4,7 +4,8 @@ go 1.12
 
 require (
 	github.com/fsnotify/fsnotify v1.4.7
+	github.com/gin-gonic/gin v1.5.0
 	github.com/goccy/go-yaml v1.1.2
-	github.com/jessevdk/go-flags v1.4.0 // indirect
+	github.com/jessevdk/go-flags v1.4.0
 	golang.org/x/sys v0.0.0-20191204072324-ce4227a45e2e // indirect
 )

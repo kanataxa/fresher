@@ -3,7 +3,6 @@ package fresher
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -35,11 +34,13 @@ type Fresher struct {
 	opt         *Option
 	event       *fsnotify.Event
 	latestEvent *fsnotify.Event
+	rebuild     chan bool
 }
 
 func New(fns ...OptionFunc) *Fresher {
 	fr := &Fresher{
-		opt: defaultOption(),
+		opt:     defaultOption(),
+		rebuild: make(chan bool, 1),
 	}
 	for _, fn := range fns {
 		fn(fr)
@@ -152,22 +153,20 @@ func (f *Fresher) buildCMD() error {
 		return err
 	}
 
+	fmt.Println("PROCESS START")
 	if err := cmd.Start(); err != nil {
 		return err
 	}
 
-	if _, err := io.Copy(os.Stdout, stdout); err != nil {
-		return err
-	}
+	go io.Copy(os.Stdout, stdout)
+	go io.Copy(os.Stderr, stderr)
 
-	errBuf, err := ioutil.ReadAll(stderr)
-	if err != nil {
-		return err
-	}
-	if err := cmd.Wait(); err != nil {
-		log.Println(string(errBuf))
-		return err
-	}
+	go func() {
+		<-f.rebuild
+		fmt.Println("KILL PROCESS")
+		cmd.Process.Kill()
+	}()
+
 	return nil
 }
 
@@ -182,7 +181,8 @@ func (f *Fresher) build() error {
 	if event == f.latestEvent {
 		return nil
 	}
-
+	f.rebuild <- true
+	fmt.Println("RUN BUILD CMD")
 	if err := f.buildCMD(); err != nil {
 		return err
 	}

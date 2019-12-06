@@ -1,0 +1,11 @@
+build:
+  dir: .
+  file: main.go
+paths:
+  - .
+exclude:
+  - vendor
+extensions:
+  - go
+ignore_test: true
+interval: 2
