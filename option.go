@@ -10,27 +10,21 @@ func BuildPath(buildPath string) OptionFunc {
 	}
 }
 
-func WatchPaths(paths []string) OptionFunc {
+func WatchPaths(paths []*RecursiveDir) OptionFunc {
 	return func(f *Fresher) {
 		f.opt.paths = paths
 	}
 }
 
-func ExcludePaths(paths []string) OptionFunc {
+func GlobalExcludePath(global *GlobalExclude) OptionFunc {
 	return func(f *Fresher) {
-		f.opt.excludePaths = paths
+		f.opt.globalExclude = global
 	}
 }
 
 func Extensions(exts []string) OptionFunc {
 	return func(f *Fresher) {
 		f.opt.exts = exts
-	}
-}
-
-func IgnoreTest(ignoreTest bool) OptionFunc {
-	return func(f *Fresher) {
-		f.opt.ignoreTest = ignoreTest
 	}
 }
 

@@ -6,27 +6,28 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
 )
 
 type Option struct {
-	buildPath    string
-	paths        []string
-	excludePaths []string
-	exts         []string
-	ignoreTest   bool
-	interval     time.Duration
+	buildPath     string
+	paths         []*RecursiveDir
+	globalExclude *GlobalExclude
+	exts          []string
+	interval      time.Duration
 }
 
 func defaultOption() *Option {
 	return &Option{
 		buildPath: "main.go",
-		paths:     []string{"."},
-		interval:  time.Second * 3,
+		paths: []*RecursiveDir{
+			{
+				Name: ".",
+			},
+		},
+		interval: time.Second * 3,
 	}
 }
 
@@ -66,9 +67,13 @@ func (f *Fresher) Watch() error {
 	go f.publish(watcher)
 	go f.subscribe()
 
+	if err := watcher.Add(f.opt.buildPath); err != nil {
+		return err
+	}
+
 	for _, path := range f.opt.paths {
-		if err := watcher.Add(path); err != nil {
-			return fmt.Errorf("failed to add file or dir: %w", err)
+		if err := path.Walk(watcher, f.opt.globalExclude); err != nil {
+			return err
 		}
 	}
 	<-done
@@ -83,9 +88,7 @@ func (f *Fresher) publish(watcher *fsnotify.Watcher) {
 			if !ok {
 				return
 			}
-			if f.shouldBuild(event.Name) && event.Op&fsnotify.Chmod != fsnotify.Chmod {
-				f.event = &event
-			}
+			f.event = &event
 		case err, ok := <-watcher.Errors:
 			if !ok {
 				return
@@ -93,52 +96,6 @@ func (f *Fresher) publish(watcher *fsnotify.Watcher) {
 			log.Println("error:", err)
 		}
 	}
-}
-
-func (f *Fresher) shouldBuild(filename string) bool {
-	if !f.includePath(filename) {
-		return false
-	}
-	if f.excludePath(filename) {
-		return false
-	}
-	if !f.includeExt(filename) {
-		return false
-	}
-	if f.opt.ignoreTest && strings.Contains(filename, "_test.go") {
-		return false
-	}
-	return true
-}
-
-func (f *Fresher) includePath(filename string) bool {
-	dir := filepath.Dir(filename)
-	for _, p := range f.opt.paths {
-		if p == dir {
-			return true
-		}
-	}
-	return false
-}
-
-func (f *Fresher) excludePath(filename string) bool {
-	dir := filepath.Dir(filename)
-	for _, p := range f.opt.excludePaths {
-		if p == dir {
-			return true
-		}
-	}
-	return false
-}
-
-func (f *Fresher) includeExt(filename string) bool {
-	ext := filepath.Ext(filename)
-	for _, p := range f.opt.exts {
-		if fmt.Sprintf(".%s", p) == ext {
-			return true
-		}
-	}
-	return false
 }
 
 func (f *Fresher) buildCMD() error {
