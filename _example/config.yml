@@ -1,12 +1,11 @@
-build:
-  dir: .
-  file: main.go
+command:
+  name: go
+  args: 
+    - run
+    - ./main.go
 path:
   - name: model
   - name: pkg
-    file:
-      - pkg.go
-      - const.go
     dir:
       - name: utils
     exclude:
