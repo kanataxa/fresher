@@ -1,11 +1,21 @@
-build:
-  dir: .
-  file: main.go
-paths:
-  - .
+command:
+  name: go
+  args: 
+    - run
+    - ./main.go
+path:
+  - name: model
+  - name: pkg
+    dir:
+      - name: utils
+    exclude:
+      - const.go
 exclude:
-  - vendor
-extensions:
+  dir:
+    - vendor
+  file:
+    - '*_test.go'
+extension:
   - go
 ignore_test: true
 interval: 2

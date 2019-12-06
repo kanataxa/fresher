@@ -1,36 +1,32 @@
 package fresher
 
-import "time"
+import (
+	"time"
+)
 
 type OptionFunc func(f *Fresher)
 
-func BuildPath(buildPath string) OptionFunc {
+func ExecCommand(command *Command) OptionFunc {
 	return func(f *Fresher) {
-		f.opt.buildPath = buildPath
+		f.opt.command = command
 	}
 }
 
-func WatchPaths(paths []string) OptionFunc {
+func WatchPaths(paths []*RecursiveDir) OptionFunc {
 	return func(f *Fresher) {
 		f.opt.paths = paths
 	}
 }
 
-func ExcludePaths(paths []string) OptionFunc {
+func GlobalExcludePath(global *GlobalExclude) OptionFunc {
 	return func(f *Fresher) {
-		f.opt.excludePaths = paths
+		f.opt.globalExclude = global
 	}
 }
 
-func Extensions(exts []string) OptionFunc {
+func Extensions(exts Extentions) OptionFunc {
 	return func(f *Fresher) {
 		f.opt.exts = exts
-	}
-}
-
-func IgnoreTest(ignoreTest bool) OptionFunc {
-	return func(f *Fresher) {
-		f.opt.ignoreTest = ignoreTest
 	}
 }
 
