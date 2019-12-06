@@ -138,12 +138,14 @@ func (f *Fresher) build() error {
 	if event == f.latestEvent {
 		return nil
 	}
+	defer func() {
+		f.latestEvent = event
+	}()
 	f.rebuild <- true
 	fmt.Println("RUN BUILD CMD")
 	if err := f.buildCMD(); err != nil {
 		return err
 	}
-	f.latestEvent = event
 	return nil
 }
 
