@@ -17,5 +17,4 @@ exclude:
     - '*_test.go'
 extension:
   - go
-ignore_test: true
 interval: 2
