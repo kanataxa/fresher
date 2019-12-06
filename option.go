@@ -16,6 +16,24 @@ func WatchPaths(paths []string) OptionFunc {
 	}
 }
 
+func ExcludePaths(paths []string) OptionFunc {
+	return func(f *Fresher) {
+		f.opt.excludePaths = paths
+	}
+}
+
+func Extensions(exts []string) OptionFunc {
+	return func(f *Fresher) {
+		f.opt.exts = exts
+	}
+}
+
+func IgnoreTest(ignoreTest bool) OptionFunc {
+	return func(f *Fresher) {
+		f.opt.ignoreTest = ignoreTest
+	}
+}
+
 func WatchInterval(interval time.Duration) OptionFunc {
 	return func(f *Fresher) {
 		f.opt.interval = interval
