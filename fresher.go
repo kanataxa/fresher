@@ -56,6 +56,12 @@ func (f *Fresher) Watch() error {
 	defer watcher.Close()
 
 	done := make(chan bool)
+	defer close(done)
+
+	if err := f.buildCMD(); err != nil {
+		log.Println("failed to build: %w", err)
+	}
+
 	go f.publish(watcher)
 	go f.subscribe()
 
@@ -134,18 +140,7 @@ func (f *Fresher) includeExt(filename string) bool {
 	return false
 }
 
-func (f *Fresher) build() error {
-	event := f.event
-	defer func() {
-		time.Sleep(f.opt.interval)
-	}()
-	if event == nil {
-		return nil
-	}
-	if event == f.latestEvent {
-		return nil
-	}
-
+func (f *Fresher) buildCMD() error {
 	cmd := exec.Command("go", "run", f.opt.buildPath)
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
@@ -171,6 +166,24 @@ func (f *Fresher) build() error {
 	}
 	if err := cmd.Wait(); err != nil {
 		log.Println(string(errBuf))
+		return err
+	}
+	return nil
+}
+
+func (f *Fresher) build() error {
+	event := f.event
+	defer func() {
+		time.Sleep(f.opt.interval)
+	}()
+	if event == nil {
+		return nil
+	}
+	if event == f.latestEvent {
+		return nil
+	}
+
+	if err := f.buildCMD(); err != nil {
 		return err
 	}
 	f.latestEvent = event
