@@ -7,18 +7,40 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
 )
 
+type Option struct {
+	buildPath string
+	paths     []string
+	interval  time.Duration
+}
+
+func defaultOption() *Option {
+	return &Option{
+		buildPath: "main.go",
+		paths:     []string{"."},
+		interval:  time.Second * 3,
+	}
+}
+
 type Fresher struct {
+	opt         *Option
 	event       *fsnotify.Event
 	latestEvent *fsnotify.Event
 }
 
-func New(opt ...func() interface{}) *Fresher {
-	return &Fresher{}
+func New(fns ...OptionFunc) *Fresher {
+	fr := &Fresher{
+		opt: defaultOption(),
+	}
+	for _, fn := range fns {
+		fn(fr)
+	}
+	return fr
 }
 
 func (f *Fresher) Watch() error {
@@ -33,9 +55,10 @@ func (f *Fresher) Watch() error {
 	go f.publish(watcher)
 	go f.subscribe()
 
-	err = watcher.Add("./testdata")
-	if err != nil {
-		return fmt.Errorf("failed to add file or dir: %w", err)
+	for _, path := range f.opt.paths {
+		if err := watcher.Add(path); err != nil {
+			return fmt.Errorf("failed to add file or dir: %w", err)
+		}
 	}
 	<-done
 	return nil
@@ -48,6 +71,9 @@ func (f *Fresher) publish(watcher *fsnotify.Watcher) {
 			if !ok {
 				return
 			}
+			if !f.shouldBuild(event.Name) {
+				return
+			}
 			f.event = &event
 		case err, ok := <-watcher.Errors:
 			if !ok {
@@ -58,10 +84,27 @@ func (f *Fresher) publish(watcher *fsnotify.Watcher) {
 	}
 }
 
+func (f *Fresher) shouldBuild(filename string) bool {
+	if !f.includePath(filename) {
+		return false
+	}
+	return true
+}
+
+func (f *Fresher) includePath(filename string) bool {
+	dir := filepath.Dir(filename)
+	for _, p := range f.opt.paths {
+		if dir == p {
+			return true
+		}
+	}
+	return false
+}
+
 func (f *Fresher) build() error {
 	event := f.event
 	defer func() {
-		time.Sleep(3 * time.Second)
+		time.Sleep(f.opt.interval)
 	}()
 	if event == nil {
 		return nil
@@ -70,7 +113,7 @@ func (f *Fresher) build() error {
 		return nil
 	}
 
-	cmd := exec.Command("go", "run", "./testdata/a.go")
+	cmd := exec.Command("go", "run", f.opt.buildPath)
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
 		return err
