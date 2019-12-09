@@ -15,7 +15,7 @@ type Option struct {
 	command       *Command
 	paths         []*RecursiveDir
 	globalExclude *GlobalExclude
-	exts          Extentions
+	exts          Extensions
 	interval      time.Duration
 }
 
@@ -30,7 +30,7 @@ func defaultOption() *Option {
 				Name: ".",
 			},
 		},
-		exts:     Extentions{"go"},
+		exts:     Extensions{"go"},
 		interval: time.Second * 3,
 	}
 }

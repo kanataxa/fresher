@@ -8,9 +8,9 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
-type Extentions []string
+type Extensions []string
 
-func (e Extentions) IsIncludeSameExt(fileName string) bool {
+func (e Extensions) IsIncludeSameExt(fileName string) bool {
 	for _, ext := range e {
 		if fmt.Sprintf(".%s", ext) == filepath.Ext(fileName) {
 			return true
