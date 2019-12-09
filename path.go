@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/goccy/go-yaml"
@@ -35,13 +36,13 @@ func (g GlobalExclude) IsExclude(path string) (bool, error) {
 	return false, nil
 }
 
-type WatcherPath struct {
+type WatcherConfig struct {
 	Name     string   `yaml:"name"`
 	Excludes []string `yaml:"exclude"`
 	Includes []string `yaml:"include"`
 }
 
-func (r *WatcherPath) UnmarshalYAML(b []byte) error {
+func (r *WatcherConfig) UnmarshalYAML(b []byte) error {
 	s := struct {
 		Name     string   `yaml:"name"`
 		Excludes []string `yaml:"exclude"`
@@ -61,7 +62,7 @@ func (r *WatcherPath) UnmarshalYAML(b []byte) error {
 	return nil
 }
 
-func (r *WatcherPath) IsExclude(path string) (bool, error) {
+func (r *WatcherConfig) IsExclude(path string) (bool, error) {
 	for _, f := range r.Excludes {
 		ok, err := filepath.Match(f, path)
 		if err != nil {
@@ -74,7 +75,7 @@ func (r *WatcherPath) IsExclude(path string) (bool, error) {
 	return false, nil
 }
 
-func (r *WatcherPath) IsInclude(path string) (bool, error) {
+func (r *WatcherConfig) IsInclude(path string) (bool, error) {
 	if len(r.Includes) == 0 {
 		return true, nil
 	}
@@ -83,6 +84,7 @@ func (r *WatcherPath) IsInclude(path string) (bool, error) {
 		if err != nil {
 			return false, err
 		}
+		fmt.Println(f, path, ok)
 		if ok {
 			return true, nil
 		}
@@ -90,68 +92,146 @@ func (r *WatcherPath) IsInclude(path string) (bool, error) {
 	return false, nil
 }
 
-func (r *WatcherPath) WalkWithDirName(watcher *fsnotify.Watcher, opt *Option, dirName string) error {
+func (r *WatcherConfig) ShouldWatch(path string, opt *Option) (bool, error) {
+	path = filepath.Base(path)
+	isGlobalExclude, err := opt.globalExclude.IsExclude(path)
+	if err != nil {
+		return false, nil
+	}
+	if isGlobalExclude {
+		return false, nil
+	}
+	isExclude, err := r.IsExclude(path)
+	if err != nil {
+		return false, nil
+	}
+	if isExclude {
+		return false, nil
+	}
+	isInclude, err := r.IsInclude(path)
+	if err != nil {
+		return false, nil
+	}
+	if !isInclude {
+		return false, nil
+	}
+	if !opt.exts.IsIncludeSameExt(path) {
+		return false, nil
+	}
+	return true, nil
+}
+
+func (r *WatcherConfig) WalkWithDirName(watcher *fsnotify.Watcher, opt *Option, dirName string) (*WatcherPath, error) {
+	watcherPath := NewWatcherPath(opt.configs, opt)
 	global := opt.globalExclude
 	isExclude, err := global.IsExclude(r.Name)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if isExclude {
-		return nil
+		return watcherPath, nil
 	}
 	if err := filepath.Walk(filepath.Join(dirName, r.Name), func(path string, info os.FileInfo, err error) error {
 		if err != nil && err != filepath.SkipDir {
 			return err
 		}
-		if info.IsDir() && info.Name() != r.Name {
+		if info.IsDir() {
+			if info.Name() == r.Name {
+				if err := watcher.Add(path); err != nil {
+					return err
+				}
+				return nil
+			}
 			isInclude, err := r.IsInclude(info.Name())
 			if err != nil {
 				return err
 			}
 			if isInclude {
+				if err := watcher.Add(path); err != nil {
+					return err
+				}
 				return nil
 			}
 			return filepath.SkipDir
 		}
 
-		isGlobalExclude, err := global.IsExclude(info.Name())
+		shouldWatch, err := r.ShouldWatch(path, opt)
 		if err != nil {
 			return err
 		}
-		if isGlobalExclude {
-			return nil
-		}
-		isExclude, err := r.IsExclude(info.Name())
-		if err != nil {
-			return err
-		}
-		if isExclude {
-			return nil
-		}
-		isInclude, err := r.IsInclude(info.Name())
-		if err != nil {
-			return err
-		}
-		if !isInclude {
-			return nil
-		}
-		if !opt.exts.IsIncludeSameExt(path) {
+		if !shouldWatch {
+			watcherPath.ignores[path] = struct{}{}
 			return nil
 		}
 		fmt.Println("Watched File:", path)
-		if err := watcher.Add(path); err != nil {
-			return err
-		}
+		watcherPath.watches[path] = struct{}{}
 		return nil
 	}); err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+	return watcherPath, nil
 
 }
-func (r *WatcherPath) Walk(watcher *fsnotify.Watcher, opt *Option) error {
-	if err := r.WalkWithDirName(watcher, opt, "."); err != nil {
-		return err
+
+func (r *WatcherConfig) Walk(watcher *fsnotify.Watcher, opt *Option) (*WatcherPath, error) {
+	watcherPath, err := r.WalkWithDirName(watcher, opt, ".")
+	if err != nil {
+		return nil, err
 	}
+	return watcherPath, nil
+}
+
+type WatcherPath struct {
+	ignores map[string]struct{}
+	watches map[string]struct{}
+	wcs     []*WatcherConfig
+	opt     *Option
+}
+
+func NewWatcherPath(wcs []*WatcherConfig, option *Option) *WatcherPath {
+	return &WatcherPath{
+		ignores: map[string]struct{}{},
+		watches: map[string]struct{}{},
+		wcs:     wcs,
+		opt:     option,
+	}
+}
+
+func (w *WatcherPath) Merge(wp *WatcherPath) {
+	for ignore := range wp.ignores {
+		w.ignores[ignore] = struct{}{}
+	}
+	for watch := range wp.watches {
+		w.watches[watch] = struct{}{}
+	}
+}
+
+func (w *WatcherPath) AddIfNeeds(path string, watcher *fsnotify.Watcher) error {
+	if strings.Contains(path, "tmp___") {
+		return nil
+	}
+	if strings.Contains(path, "old___") {
+		return nil
+	}
+	if _, exists := w.ignores[path]; exists {
+		return nil
+	}
+	if _, exists := w.watches[path]; exists {
+		return nil
+	}
+	for _, wc := range w.wcs {
+		shouldWatch, err := wc.ShouldWatch(path, w.opt)
+		if err != nil {
+			return err
+		}
+		if shouldWatch {
+			if err := watcher.Add(path); err != nil {
+				return err
+			}
+			w.watches[path] = struct{}{}
+			return nil
+		}
+	}
+	w.ignores[path] = struct{}{}
 	return nil
 }
