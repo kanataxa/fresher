@@ -8,6 +8,8 @@ path:
   - name: pkg
     dir:
       - name: utils
+    include:
+      - pkg.go
     exclude:
       - const.go
 exclude:
