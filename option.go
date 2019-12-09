@@ -24,7 +24,7 @@ func GlobalExcludePath(global *GlobalExclude) OptionFunc {
 	}
 }
 
-func Extensions(exts Extentions) OptionFunc {
+func ExtensionPaths(exts Extensions) OptionFunc {
 	return func(f *Fresher) {
 		f.opt.exts = exts
 	}

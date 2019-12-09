@@ -8,9 +8,9 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
-type Extentions []string
+type Extensions []string
 
-func (e Extentions) IsIncludeSameExt(fileName string) bool {
+func (e Extensions) IsIncludeSameExt(fileName string) bool {
 	for _, ext := range e {
 		if fmt.Sprintf(".%s", ext) == filepath.Ext(fileName) {
 			return true
@@ -49,11 +49,28 @@ func (g *GlobalExclude) IsExcludeFile(fileName string) (bool, error) {
 type RecursiveDir struct {
 	Name         string          `yaml:"name"`
 	ExcludeFiles []string        `yaml:"exclude"`
+	IncludeFiles []string        `yaml:"include"`
 	Dirs         []*RecursiveDir `yaml:"dir"`
 }
 
 func (r *RecursiveDir) IsExcludeFile(fileName string) (bool, error) {
 	for _, f := range r.ExcludeFiles {
+		ok, err := filepath.Match(f, fileName)
+		if err != nil {
+			return false, err
+		}
+		if ok {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (r *RecursiveDir) IsIncludeFile(fileName string) (bool, error) {
+	if len(r.IncludeFiles) == 0 {
+		return true, nil
+	}
+	for _, f := range r.IncludeFiles {
 		ok, err := filepath.Match(f, fileName)
 		if err != nil {
 			return false, err
@@ -92,10 +109,17 @@ func (r *RecursiveDir) WalkWithDirName(watcher *fsnotify.Watcher, opt *Option, d
 		if isExclude {
 			return nil
 		}
+		isInclude, err := r.IsIncludeFile(info.Name())
+		if err != nil {
+			return err
+		}
+		if !isInclude {
+			return nil
+		}
 		if !opt.exts.IsIncludeSameExt(path) {
 			return nil
 		}
-		fmt.Println("Wathed File:", path)
+		fmt.Println("Watched File:", path)
 		if err := watcher.Add(path); err != nil {
 			return err
 		}

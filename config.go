@@ -17,7 +17,7 @@ type Config struct {
 	Command     *Command        `yaml:"command"`
 	Paths       []*RecursiveDir `yaml:"path"`
 	ExcludePath *GlobalExclude  `yaml:"exclude"`
-	Extensions  Extentions      `yaml:"extension"`
+	Extensions  Extensions      `yaml:"extension"`
 	Interval    time.Duration   `yaml:"interval"`
 }
 
@@ -48,7 +48,7 @@ func (c *Config) Options() []OptionFunc {
 		funcs = append(funcs, GlobalExcludePath(c.ExcludePath))
 	}
 	if len(c.Extensions) > 0 {
-		funcs = append(funcs, Extensions(c.Extensions))
+		funcs = append(funcs, ExtensionPaths(c.Extensions))
 	}
 	if c.Interval > 0 {
 		funcs = append(funcs, WatchInterval(c.Interval*time.Second))
