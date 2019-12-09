@@ -91,7 +91,21 @@ func (r *WatcherConfig) IsInclude(path string) (bool, error) {
 	return false, nil
 }
 
-func (r *WatcherConfig) ShouldWatch(path string, opt *Option) (bool, error) {
+func (r *WatcherConfig) ShouldWatchFile(path string, opt *Option) (bool, error) {
+	shouldWatch, err := r.shouldWatch(path, opt)
+	if err != nil {
+		return false, err
+	}
+	if !shouldWatch {
+		return false, nil
+	}
+	if !opt.exts.IsIncludeSameExt(path) {
+		return false, nil
+	}
+	return true, nil
+}
+
+func (r *WatcherConfig) shouldWatch(path string, opt *Option) (bool, error) {
 	path = filepath.Base(path)
 	isGlobalExclude, err := opt.globalExclude.IsExclude(path)
 	if err != nil {
@@ -114,10 +128,15 @@ func (r *WatcherConfig) ShouldWatch(path string, opt *Option) (bool, error) {
 	if !isInclude {
 		return false, nil
 	}
-	if !opt.exts.IsIncludeSameExt(path) {
-		return false, nil
-	}
 	return true, nil
+}
+
+func (r *WatcherConfig) SkipDir(dirName string, opt *Option) (bool, error) {
+	shouldWatch, err := r.shouldWatch(dirName, opt)
+	if err != nil {
+		return false, err
+	}
+	return !shouldWatch, nil
 }
 
 func (r *WatcherConfig) WalkWithDirName(watcher *fsnotify.Watcher, opt *Option, dirName string) (*WatcherPath, error) {
@@ -141,11 +160,11 @@ func (r *WatcherConfig) WalkWithDirName(watcher *fsnotify.Watcher, opt *Option, 
 				}
 				return nil
 			}
-			isInclude, err := r.IsInclude(info.Name())
+			skipDir, err := r.SkipDir(path, opt)
 			if err != nil {
 				return err
 			}
-			if isInclude {
+			if !skipDir {
 				if err := watcher.Add(path); err != nil {
 					return err
 				}
@@ -154,7 +173,7 @@ func (r *WatcherConfig) WalkWithDirName(watcher *fsnotify.Watcher, opt *Option, 
 			return filepath.SkipDir
 		}
 
-		shouldWatch, err := r.ShouldWatch(path, opt)
+		shouldWatch, err := r.ShouldWatchFile(path, opt)
 		if err != nil {
 			return err
 		}
@@ -220,7 +239,7 @@ func (w *WatcherPath) AddIfNeeds(path string, watcher *fsnotify.Watcher) error {
 		return nil
 	}
 	for _, wc := range w.wcs {
-		shouldWatch, err := wc.ShouldWatch(path, w.opt)
+		shouldWatch, err := wc.ShouldWatchFile(path, w.opt)
 		if err != nil {
 			return err
 		}
