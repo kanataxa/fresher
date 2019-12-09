@@ -5,9 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/goccy/go-yaml"
-
 	"github.com/fsnotify/fsnotify"
+	"github.com/goccy/go-yaml"
 )
 
 type Extensions []string
