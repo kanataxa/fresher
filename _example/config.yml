@@ -1,9 +1,12 @@
 command:
   name: go
-  args: 
+  args:
     - run
     - ./main.go
 path:
+  - name: .
+    include:
+      - main.go
   - name: model
   - name: pkg
     dir:
