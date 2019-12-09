@@ -84,7 +84,6 @@ func (r *WatcherConfig) IsInclude(path string) (bool, error) {
 		if err != nil {
 			return false, err
 		}
-		fmt.Println(f, path, ok)
 		if ok {
 			return true, nil
 		}
@@ -160,10 +159,11 @@ func (r *WatcherConfig) WalkWithDirName(watcher *fsnotify.Watcher, opt *Option, 
 			return err
 		}
 		if !shouldWatch {
+			log.IgnoreFile(path)
 			watcherPath.ignores[path] = struct{}{}
 			return nil
 		}
-		fmt.Println("Watched File:", path)
+		log.WatchFile(path)
 		watcherPath.watches[path] = struct{}{}
 		return nil
 	}); err != nil {
@@ -225,6 +225,7 @@ func (w *WatcherPath) AddIfNeeds(path string, watcher *fsnotify.Watcher) error {
 			return err
 		}
 		if shouldWatch {
+			log.WatchFile(path)
 			if err := watcher.Add(path); err != nil {
 				return err
 			}
@@ -232,6 +233,7 @@ func (w *WatcherPath) AddIfNeeds(path string, watcher *fsnotify.Watcher) error {
 			return nil
 		}
 	}
+	log.IgnoreFile(path)
 	w.ignores[path] = struct{}{}
 	return nil
 }

@@ -3,7 +3,7 @@ package fresher
 import (
 	"fmt"
 	"io"
-	"log"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -52,10 +52,10 @@ func New(fns ...OptionFunc) *Fresher {
 }
 
 func (f *Fresher) Watch() error {
-	log.Println("Start Watching......")
+	log.Info("Start Watching......")
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		return fmt.Errorf("failed to init watcher: %w", err)
+		return fmt.Errorf("failed to init watcher: %v\n", err)
 	}
 	defer watcher.Close()
 
@@ -63,7 +63,7 @@ func (f *Fresher) Watch() error {
 	defer close(done)
 
 	if err := f.run(); err != nil {
-		log.Println("failed to build: %w", err)
+		log.Error(fmt.Errorf("failed to build: %v\n", err))
 	}
 
 	watcherPath := NewWatcherPath(f.opt.configs, f.opt)
@@ -79,7 +79,6 @@ func (f *Fresher) Watch() error {
 	go f.subscribe()
 
 	<-done
-	fmt.Println("DONE")
 	return nil
 }
 
@@ -95,34 +94,46 @@ func (f *Fresher) publish(watcher *fsnotify.Watcher, watcherPath *WatcherPath) {
 			}
 			if event.Op&fsnotify.Create == fsnotify.Create {
 				if err := watcherPath.AddIfNeeds(event.Name, watcher); err != nil {
-					log.Println(err)
+					log.Error(err)
 					continue
 				}
 			}
 			if _, exists := watcherPath.watches[event.Name]; !exists {
 				continue
 			}
+			log.UpdateFile(event.Name)
 			f.event = &event
 		case err, ok := <-watcher.Errors:
 			if !ok {
 				continue
 			}
-			log.Println("error:", err)
+			log.Error(err)
 		}
 	}
 }
 
 func (f *Fresher) buildTarget() error {
 	cmd := exec.Command("go", "build", "-o", filepath.Join(os.TempDir(), "fresher_run"), f.opt.target)
-	output, err := cmd.Output()
+
+	stderr, err := cmd.StderrPipe()
 	if err != nil {
 		return err
 	}
-	log.Println(string(output))
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	errBuf, err := ioutil.ReadAll(stderr)
+	if err != nil {
+		return err
+	}
+	if len(errBuf) > 0 {
+		log.Error(string(errBuf))
+	}
 	return nil
 }
 
 func (f *Fresher) run() error {
+	log.Building()
 	if err := f.buildTarget(); err != nil {
 		return err
 	}
@@ -137,7 +148,7 @@ func (f *Fresher) run() error {
 		return err
 	}
 
-	fmt.Println("PROCESS START")
+	log.Info("Waiting...")
 	if err := cmd.Start(); err != nil {
 		return err
 	}
@@ -147,7 +158,7 @@ func (f *Fresher) run() error {
 
 	go func() {
 		<-f.rebuild
-		fmt.Println("KILL PROCESS")
+		log.Info("Kill Process")
 		cmd.Process.Kill()
 	}()
 
