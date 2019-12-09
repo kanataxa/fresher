@@ -1,6 +1,7 @@
 target: main.go
 path:
   - .
+  - name: no_exists_dir
   - name: model
   - name: pkg
     include:

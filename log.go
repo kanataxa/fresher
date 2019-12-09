@@ -47,7 +47,7 @@ func (l *Log) Error(v interface{}) {
 }
 
 func (l *Log) msg(code int, msg string) string {
-	return fmt.Sprintf("\x1b[%dm%s\x1b[0m", code, fmt.Sprintf("%s: %s", "Watcher", msg))
+	return fmt.Sprintf("\033[%dm%s\033[0m", code, fmt.Sprintf("%s: %s", "Watcher", msg))
 }
 
 func init() {

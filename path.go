@@ -141,6 +141,13 @@ func (r *WatcherConfig) SkipDir(dirName string, opt *Option) (bool, error) {
 
 func (r *WatcherConfig) WalkWithDirName(watcher *fsnotify.Watcher, opt *Option, dirName string) (*WatcherPath, error) {
 	watcherPath := NewWatcherPath(opt.configs, opt)
+	if _, err := os.Stat(filepath.Join(dirName, r.Name)); err != nil {
+		if os.IsNotExist(err) {
+			log.IgnoreFile(filepath.Join(dirName, r.Name))
+			return watcherPath, nil
+		}
+	}
+
 	global := opt.globalExclude
 	isExclude, err := global.IsExclude(r.Name)
 	if err != nil {
