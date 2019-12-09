@@ -128,6 +128,7 @@ func (f *Fresher) buildTarget() error {
 	}
 	if len(errBuf) > 0 {
 		log.Error(string(errBuf))
+		return fmt.Errorf("failed to build: [%s]", string(errBuf))
 	}
 	return nil
 }
