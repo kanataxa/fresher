@@ -9,17 +9,14 @@ path:
       - main.go
   - name: model
   - name: pkg
-    dir:
-      - name: utils
     include:
-      - pkg.go
+      - utils*
+      - config.go
     exclude:
       - const.go
 exclude:
-  dir:
-    - vendor
-  file:
-    - '*_test.go'
+  - vendor
+  - '*_test.go'
 extension:
   - go
 interval: 2

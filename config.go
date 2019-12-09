@@ -14,11 +14,11 @@ type Command struct {
 }
 
 type Config struct {
-	Command     *Command        `yaml:"command"`
-	Paths       []*RecursiveDir `yaml:"path"`
-	ExcludePath *GlobalExclude  `yaml:"exclude"`
-	Extensions  Extensions      `yaml:"extension"`
-	Interval    time.Duration   `yaml:"interval"`
+	Command     *Command       `yaml:"command"`
+	Paths       []*WatcherPath `yaml:"path"`
+	ExcludePath *GlobalExclude `yaml:"exclude"`
+	Extensions  Extensions     `yaml:"extension"`
+	Interval    time.Duration  `yaml:"interval"`
 }
 
 func LoadConfig(filename string) (*Config, error) {
