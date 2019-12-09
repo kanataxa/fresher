@@ -1,6 +1,6 @@
 command:
   name: go
-  args:
+  arg:
     - run
     - ./main.go
 path:
