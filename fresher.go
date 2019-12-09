@@ -6,13 +6,14 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
 )
 
 type Option struct {
-	command       *Command
+	target        string
 	paths         []*WatcherPath
 	globalExclude *GlobalExclude
 	exts          Extensions
@@ -21,10 +22,7 @@ type Option struct {
 
 func defaultOption() *Option {
 	return &Option{
-		command: &Command{
-			Name: "go",
-			Args: []string{"version"},
-		},
+		target: "main.go",
 		paths: []*WatcherPath{
 			{
 				Name: ".",
@@ -64,7 +62,7 @@ func (f *Fresher) Watch() error {
 	done := make(chan bool)
 	defer close(done)
 
-	if err := f.buildCMD(); err != nil {
+	if err := f.run(); err != nil {
 		log.Println("failed to build: %w", err)
 	}
 
@@ -76,7 +74,9 @@ func (f *Fresher) Watch() error {
 			return err
 		}
 	}
+
 	<-done
+	fmt.Println("DONE")
 	return nil
 }
 
@@ -90,6 +90,7 @@ func (f *Fresher) publish(watcher *fsnotify.Watcher) {
 			}
 			f.event = &event
 		case err, ok := <-watcher.Errors:
+			fmt.Println("ERRR", err)
 			if !ok {
 				return
 			}
@@ -98,8 +99,21 @@ func (f *Fresher) publish(watcher *fsnotify.Watcher) {
 	}
 }
 
-func (f *Fresher) buildCMD() error {
-	cmd := exec.Command(f.opt.command.Name, f.opt.command.Args...)
+func (f *Fresher) buildTarget() error {
+	cmd := exec.Command("go", "build", "-o", filepath.Join(os.TempDir(), "fresher_run"), f.opt.target)
+	output, err := cmd.Output()
+	if err != nil {
+		return err
+	}
+	log.Println(string(output))
+	return nil
+}
+
+func (f *Fresher) run() error {
+	if err := f.buildTarget(); err != nil {
+		return err
+	}
+	cmd := exec.Command(filepath.Join(os.TempDir(), "fresher_run"))
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
 		return err
@@ -142,8 +156,7 @@ func (f *Fresher) build() error {
 		f.latestEvent = event
 	}()
 	f.rebuild <- true
-	fmt.Println("RUN BUILD CMD")
-	if err := f.buildCMD(); err != nil {
+	if err := f.run(); err != nil {
 		return err
 	}
 	return nil

@@ -8,13 +8,8 @@ import (
 	yaml "github.com/goccy/go-yaml"
 )
 
-type Command struct {
-	Name string   `yaml:"name"`
-	Args []string `yaml:"arg"`
-}
-
 type Config struct {
-	Command     *Command       `yaml:"command"`
+	Target      string         `yaml:"target"`
 	Paths       []*WatcherPath `yaml:"path"`
 	ExcludePath *GlobalExclude `yaml:"exclude"`
 	Extensions  Extensions     `yaml:"extension"`
@@ -38,8 +33,8 @@ func (c *Config) Options() []OptionFunc {
 		return nil
 	}
 	var funcs []OptionFunc
-	if c.Command != nil {
-		funcs = append(funcs, ExecCommand(c.Command))
+	if c.Target != "" {
+		funcs = append(funcs, ExecTarget(c.Target))
 	}
 	if len(c.Paths) > 0 {
 		funcs = append(funcs, WatchPaths(c.Paths))

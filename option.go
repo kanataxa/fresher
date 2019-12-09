@@ -6,9 +6,9 @@ import (
 
 type OptionFunc func(f *Fresher)
 
-func ExecCommand(command *Command) OptionFunc {
+func ExecTarget(target string) OptionFunc {
 	return func(f *Fresher) {
-		f.opt.command = command
+		f.opt.target = target
 	}
 }
 
