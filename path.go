@@ -19,23 +19,11 @@ func (e Extensions) IsIncludeSameExt(fileName string) bool {
 	return false
 }
 
-type GlobalExclude struct {
-	Files []string `json:"file"`
-	Dirs  []string `json:"dir"`
-}
+type GlobalExclude []string
 
-func (g *GlobalExclude) IsExcludeDir(dir string) bool {
-	for _, d := range g.Dirs {
-		if d == dir {
-			return true
-		}
-	}
-	return false
-}
-
-func (g *GlobalExclude) IsExcludeFile(fileName string) (bool, error) {
-	for _, f := range g.Files {
-		ok, err := filepath.Match(f, fileName)
+func (g GlobalExclude) IsExclude(path string) (bool, error) {
+	for _, d := range g {
+		ok, err := filepath.Match(d, path)
 		if err != nil {
 			return false, err
 		}
@@ -46,16 +34,15 @@ func (g *GlobalExclude) IsExcludeFile(fileName string) (bool, error) {
 	return false, nil
 }
 
-type RecursiveDir struct {
-	Name         string          `yaml:"name"`
-	ExcludeFiles []string        `yaml:"exclude"`
-	IncludeFiles []string        `yaml:"include"`
-	Dirs         []*RecursiveDir `yaml:"dir"`
+type WatcherPath struct {
+	Name     string   `yaml:"name"`
+	Excludes []string `yaml:"exclude"`
+	Includes []string `yaml:"include"`
 }
 
-func (r *RecursiveDir) IsExcludeFile(fileName string) (bool, error) {
-	for _, f := range r.ExcludeFiles {
-		ok, err := filepath.Match(f, fileName)
+func (r *WatcherPath) IsExclude(path string) (bool, error) {
+	for _, f := range r.Excludes {
+		ok, err := filepath.Match(f, path)
 		if err != nil {
 			return false, err
 		}
@@ -66,12 +53,12 @@ func (r *RecursiveDir) IsExcludeFile(fileName string) (bool, error) {
 	return false, nil
 }
 
-func (r *RecursiveDir) IsIncludeFile(fileName string) (bool, error) {
-	if len(r.IncludeFiles) == 0 {
+func (r *WatcherPath) IsInclude(path string) (bool, error) {
+	if len(r.Includes) == 0 {
 		return true, nil
 	}
-	for _, f := range r.IncludeFiles {
-		ok, err := filepath.Match(f, fileName)
+	for _, f := range r.Includes {
+		ok, err := filepath.Match(f, path)
 		if err != nil {
 			return false, err
 		}
@@ -82,9 +69,13 @@ func (r *RecursiveDir) IsIncludeFile(fileName string) (bool, error) {
 	return false, nil
 }
 
-func (r *RecursiveDir) WalkWithDirName(watcher *fsnotify.Watcher, opt *Option, dirName string) error {
+func (r *WatcherPath) WalkWithDirName(watcher *fsnotify.Watcher, opt *Option, dirName string) error {
 	global := opt.globalExclude
-	if global.IsExcludeDir(r.Name) {
+	isExclude, err := global.IsExclude(r.Name)
+	if err != nil {
+		return err
+	}
+	if isExclude {
 		return nil
 	}
 	if err := filepath.Walk(filepath.Join(dirName, r.Name), func(path string, info os.FileInfo, err error) error {
@@ -92,24 +83,31 @@ func (r *RecursiveDir) WalkWithDirName(watcher *fsnotify.Watcher, opt *Option, d
 			return err
 		}
 		if info.IsDir() && info.Name() != r.Name {
+			isInclude, err := r.IsInclude(info.Name())
+			if err != nil {
+				return err
+			}
+			if isInclude {
+				return nil
+			}
 			return filepath.SkipDir
 		}
 
-		isGlobalExclude, err := global.IsExcludeFile(info.Name())
+		isGlobalExclude, err := global.IsExclude(info.Name())
 		if err != nil {
 			return err
 		}
 		if isGlobalExclude {
 			return nil
 		}
-		isExclude, err := r.IsExcludeFile(info.Name())
+		isExclude, err := r.IsExclude(info.Name())
 		if err != nil {
 			return err
 		}
 		if isExclude {
 			return nil
 		}
-		isInclude, err := r.IsIncludeFile(info.Name())
+		isInclude, err := r.IsInclude(info.Name())
 		if err != nil {
 			return err
 		}
@@ -127,16 +125,10 @@ func (r *RecursiveDir) WalkWithDirName(watcher *fsnotify.Watcher, opt *Option, d
 	}); err != nil {
 		return err
 	}
-
-	for _, dir := range r.Dirs {
-		if err := dir.WalkWithDirName(watcher, opt, filepath.Join(dirName, r.Name)); err != nil {
-			return err
-		}
-	}
 	return nil
 
 }
-func (r *RecursiveDir) Walk(watcher *fsnotify.Watcher, opt *Option) error {
+func (r *WatcherPath) Walk(watcher *fsnotify.Watcher, opt *Option) error {
 	if err := r.WalkWithDirName(watcher, opt, "."); err != nil {
 		return err
 	}

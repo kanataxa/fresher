@@ -13,7 +13,7 @@ import (
 
 type Option struct {
 	command       *Command
-	paths         []*RecursiveDir
+	paths         []*WatcherPath
 	globalExclude *GlobalExclude
 	exts          Extensions
 	interval      time.Duration
@@ -25,7 +25,7 @@ func defaultOption() *Option {
 			Name: "go",
 			Args: []string{"version"},
 		},
-		paths: []*RecursiveDir{
+		paths: []*WatcherPath{
 			{
 				Name: ".",
 			},

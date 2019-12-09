@@ -12,7 +12,7 @@ func ExecCommand(command *Command) OptionFunc {
 	}
 }
 
-func WatchPaths(paths []*RecursiveDir) OptionFunc {
+func WatchPaths(paths []*WatcherPath) OptionFunc {
 	return func(f *Fresher) {
 		f.opt.paths = paths
 	}
