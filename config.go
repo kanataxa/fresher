@@ -10,7 +10,7 @@ import (
 
 type Command struct {
 	Name string   `yaml:"name"`
-	Args []string `yaml:"args"`
+	Args []string `yaml:"arg"`
 }
 
 type Config struct {

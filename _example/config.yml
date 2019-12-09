@@ -1,12 +1,10 @@
 command:
   name: go
-  args:
+  arg:
     - run
     - ./main.go
 path:
-  - name: .
-    include:
-      - main.go
+  - .
   - name: model
   - name: pkg
     include:

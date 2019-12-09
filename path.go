@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/goccy/go-yaml"
 )
 
 type Extensions []string
@@ -38,6 +39,26 @@ type WatcherPath struct {
 	Name     string   `yaml:"name"`
 	Excludes []string `yaml:"exclude"`
 	Includes []string `yaml:"include"`
+}
+
+func (r *WatcherPath) UnmarshalYAML(b []byte) error {
+	s := struct {
+		Name     string   `yaml:"name"`
+		Excludes []string `yaml:"exclude"`
+		Includes []string `yaml:"include"`
+	}{}
+	if err := yaml.Unmarshal(b, &s); err != nil {
+		var name string
+		if err := yaml.Unmarshal(b, &name); err != nil {
+			return err
+		}
+		r.Name = name
+		return nil
+	}
+	r.Name = s.Name
+	r.Excludes = s.Excludes
+	r.Includes = s.Includes
+	return nil
 }
 
 func (r *WatcherPath) IsExclude(path string) (bool, error) {
