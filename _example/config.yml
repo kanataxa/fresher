@@ -1,8 +1,4 @@
-command:
-  name: go
-  arg:
-    - run
-    - ./main.go
+target: main.go
 path:
   - .
   - name: model
