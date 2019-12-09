@@ -14,7 +14,7 @@ import (
 
 type Option struct {
 	target        string
-	paths         []*WatcherPath
+	configs       []*WatcherConfig
 	globalExclude *GlobalExclude
 	exts          Extensions
 	interval      time.Duration
@@ -23,7 +23,7 @@ type Option struct {
 func defaultOption() *Option {
 	return &Option{
 		target: "main.go",
-		paths: []*WatcherPath{
+		configs: []*WatcherConfig{
 			{
 				Name: ".",
 			},
@@ -66,33 +66,46 @@ func (f *Fresher) Watch() error {
 		log.Println("failed to build: %w", err)
 	}
 
-	go f.publish(watcher)
-	go f.subscribe()
-
-	for _, path := range f.opt.paths {
-		if err := path.Walk(watcher, f.opt); err != nil {
+	watcherPath := NewWatcherPath(f.opt.configs, f.opt)
+	for _, path := range f.opt.configs {
+		wp, err := path.Walk(watcher, f.opt)
+		if err != nil {
 			return err
 		}
+		watcherPath.Merge(wp)
 	}
+
+	go f.publish(watcher, watcherPath)
+	go f.subscribe()
 
 	<-done
 	fmt.Println("DONE")
 	return nil
 }
 
-func (f *Fresher) publish(watcher *fsnotify.Watcher) {
+func (f *Fresher) publish(watcher *fsnotify.Watcher, watcherPath *WatcherPath) {
 	for {
 		select {
 		case event, ok := <-watcher.Events:
-			fmt.Println(event)
 			if !ok {
-				return
+				continue
+			}
+			if event.Op&fsnotify.Chmod == fsnotify.Chmod {
+				continue
+			}
+			if event.Op&fsnotify.Create == fsnotify.Create {
+				if err := watcherPath.AddIfNeeds(event.Name, watcher); err != nil {
+					log.Println(err)
+					continue
+				}
+			}
+			if _, exists := watcherPath.watches[event.Name]; !exists {
+				continue
 			}
 			f.event = &event
 		case err, ok := <-watcher.Errors:
-			fmt.Println("ERRR", err)
 			if !ok {
-				return
+				continue
 			}
 			log.Println("error:", err)
 		}

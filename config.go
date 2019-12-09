@@ -9,11 +9,11 @@ import (
 )
 
 type Config struct {
-	Target      string         `yaml:"target"`
-	Paths       []*WatcherPath `yaml:"path"`
-	ExcludePath *GlobalExclude `yaml:"exclude"`
-	Extensions  Extensions     `yaml:"extension"`
-	Interval    time.Duration  `yaml:"interval"`
+	Target      string           `yaml:"target"`
+	Paths       []*WatcherConfig `yaml:"path"`
+	ExcludePath *GlobalExclude   `yaml:"exclude"`
+	Extensions  Extensions       `yaml:"extension"`
+	Interval    time.Duration    `yaml:"interval"`
 }
 
 func LoadConfig(filename string) (*Config, error) {
@@ -37,7 +37,7 @@ func (c *Config) Options() []OptionFunc {
 		funcs = append(funcs, ExecTarget(c.Target))
 	}
 	if len(c.Paths) > 0 {
-		funcs = append(funcs, WatchPaths(c.Paths))
+		funcs = append(funcs, WatchConfigs(c.Paths))
 	}
 	if c.ExcludePath != nil {
 		funcs = append(funcs, GlobalExcludePath(c.ExcludePath))

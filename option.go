@@ -12,9 +12,9 @@ func ExecTarget(target string) OptionFunc {
 	}
 }
 
-func WatchPaths(paths []*WatcherPath) OptionFunc {
+func WatchConfigs(configs []*WatcherConfig) OptionFunc {
 	return func(f *Fresher) {
-		f.opt.paths = paths
+		f.opt.configs = configs
 	}
 }
 
