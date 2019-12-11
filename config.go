@@ -7,9 +7,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+
+	"strings"
 	"time"
 
-	yaml "github.com/goccy/go-yaml"
+	"github.com/goccy/go-yaml"
 )
 
 type Config struct {
@@ -21,46 +23,91 @@ type Config struct {
 }
 
 type BuildConfig struct {
-	Target string `yaml:"target"`
-	OSType string `yaml:"os"`
-	Arch   string `yaml:"arch"`
+	Target         string     `yaml:"target"`
+	Output         string     `yaml:"output"`
+	Environ        []string   `yaml:"env"`
+	Arg            []string   `yaml:"arg"`
+	WithoutRun     bool       `yaml:"without_run"`
+	BeforeCommands []*Command `yaml:"before"`
+	AfterCommands  []*Command `yaml:"after"`
 }
 
-func (bc *BuildConfig) Environ() []string {
-	env := []string{}
-	if bc.OSType != "" {
-		env = append(env, fmt.Sprintf("GOOS=%s", bc.OSType))
+func (bc *BuildConfig) runBinaryPath() string {
+	if bc.Output != "" {
+		return bc.Output
 	}
-	if bc.Arch != "" {
-		env = append(env, fmt.Sprintf("GOARCH=%s", bc.Arch))
-	}
-	return env
-}
-
-func (bc *BuildConfig) execFilePath() string {
 	name := "fresher_run"
-	if bc.OSType == "windows" || runtime.GOOS == "windows" {
+	var isIncludeGOOSEnv bool
+	for _, env := range bc.Environ {
+		if strings.Contains(env, "GOOS") {
+			isIncludeGOOSEnv = true
+			if strings.Contains(env, "windows") {
+				name += ".exe"
+			}
+			break
+		}
+	}
+	if !isIncludeGOOSEnv && runtime.GOOS == "windows" {
 		name += ".exe"
 	}
 	return filepath.Join(os.TempDir(), name)
 }
 
-func (bc *BuildConfig) BuildCommand() *exec.Cmd {
-	cmd := exec.Command("go", "build", "-o", bc.execFilePath(), bc.Target)
-	cmd.Env = append(os.Environ(), bc.Environ()...)
-	return cmd
+func (bc *BuildConfig) buildArg() []string {
+	arg := []string{"build", "-o", bc.runBinaryPath()}
+	if len(bc.Arg) > 0 {
+		arg = append(arg, bc.Arg...)
+	}
+	arg = append(arg, bc.Target)
+	return arg
 }
 
-func (bc *BuildConfig) RunCommand() *exec.Cmd {
-	cmd := exec.Command(bc.execFilePath())
-	return cmd
+func (bc *BuildConfig) Commands() []*Command {
+	commands := []*Command{
+		bc.BuildCommand(),
+	}
+	if cmd := bc.RunCommand(); cmd != nil {
+		commands = append(commands, cmd)
+	}
+	if len(bc.BeforeCommands) > 0 {
+		commands = append(append([]*Command{}, bc.BeforeCommands...), commands...)
+	}
+	if len(bc.AfterCommands) > 0 {
+		commands = append(commands, bc.AfterCommands...)
+	}
+	return commands
+}
+
+func (bc *BuildConfig) BuildCommand() *Command {
+	cmd := exec.Command("go", bc.buildArg()...)
+	cmd.Env = append(os.Environ(), bc.Environ...)
+	return &Command{
+		Name:    "go",
+		Arg:     bc.buildArg(),
+		Environ: append(os.Environ(), bc.Environ...),
+		IsAsync: false,
+	}
+}
+
+func (bc *BuildConfig) RunCommand() *Command {
+	if bc.WithoutRun {
+		return nil
+	}
+	return &Command{
+		Name:    bc.runBinaryPath(),
+		IsAsync: true,
+	}
 }
 
 func (bc *BuildConfig) UnmarshalYAML(b []byte) error {
 	st := struct {
-		Target string `yaml:"target"`
-		OSType string `yaml:"os"`
-		Arch   string `yaml:"arch"`
+		Target         string     `yaml:"target"`
+		Output         string     `yaml:"output"`
+		Environ        []string   `yaml:"env"`
+		Arg            []string   `yaml:"arg"`
+		WithoutRun     bool       `yaml:"without_run"`
+		BeforeCommands []*Command `yaml:"before"`
+		AfterCommands  []*Command `yaml:"after"`
 	}{}
 	if err := yaml.Unmarshal(b, &st); err != nil {
 		var target string
@@ -71,8 +118,12 @@ func (bc *BuildConfig) UnmarshalYAML(b []byte) error {
 		return nil
 	}
 	bc.Target = st.Target
-	bc.OSType = st.OSType
-	bc.Arch = st.Arch
+	bc.Output = st.Output
+	bc.Environ = st.Environ
+	bc.Arg = st.Arg
+	bc.WithoutRun = st.WithoutRun
+	bc.BeforeCommands = st.BeforeCommands
+	bc.AfterCommands = st.AfterCommands
 	return nil
 }
 

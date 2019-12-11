@@ -2,8 +2,6 @@ package fresher
 
 import (
 	"fmt"
-	"io"
-	"io/ioutil"
 	"os"
 	"time"
 
@@ -112,56 +110,27 @@ func (f *Fresher) publish(watcher *fsnotify.Watcher, watcherPath *WatcherPath) {
 	}
 }
 
-func (f *Fresher) buildTarget() error {
-	cmd := f.opt.build.BuildCommand()
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		return err
-	}
-	if err := cmd.Start(); err != nil {
-		return err
-	}
-	errBuf, err := ioutil.ReadAll(stderr)
-	if err != nil {
-		return err
-	}
-	if len(errBuf) > 0 {
-		log.Error(string(errBuf))
-		return fmt.Errorf("failed to build: [%s]", string(errBuf))
-	}
-	return nil
-}
-
 func (f *Fresher) run() error {
 	log.Building()
-	if err := f.buildTarget(); err != nil {
-		return err
+	procs := []*os.Process{}
+	for _, cmd := range f.opt.build.Commands() {
+		proc, err := cmd.Exec()
+		if err != nil {
+			return err
+		}
+		if proc == nil {
+			continue
+		}
+		log.Info(fmt.Sprintf("Run Process [%d]", proc.Pid))
+		procs = append(procs, proc)
 	}
-	cmd := f.opt.build.RunCommand()
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		return err
-	}
-
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return err
-	}
-
-	log.Info("Waiting...")
-	if err := cmd.Start(); err != nil {
-		return err
-	}
-
-	go io.Copy(os.Stdout, stdout)
-	go io.Copy(os.Stderr, stderr)
-
 	go func() {
 		<-f.rebuild
-		log.Info("Kill Exec Process")
-		cmd.Process.Kill()
+		for _, proc := range procs {
+			log.Info(fmt.Sprintf("Kill Exec Process [%d]", proc.Pid))
+			proc.Kill()
+		}
 	}()
-
 	return nil
 }
 
