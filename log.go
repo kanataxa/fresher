@@ -23,11 +23,11 @@ const (
 )
 
 func (l *Log) WatchFile(path string) {
-	l.Infof(l.msg(magenta, fmt.Sprintf("Watching file [%s]", path)))
+	l.Info(l.msg(magenta, fmt.Sprintf("Watching file [%s]", path)))
 }
 
 func (l *Log) UpdateFile(path string) {
-	l.Infof(l.msg(green, fmt.Sprintf("Rebuild to updated watched file [%s]", path)))
+	l.Info(l.msg(green, fmt.Sprintf("Rebuild to updated watched file [%s]", path)))
 }
 
 func (l *Log) IgnoreFile(path string) {
@@ -35,23 +35,26 @@ func (l *Log) IgnoreFile(path string) {
 }
 
 func (l *Log) Building() {
-	l.Infof(l.msg(yellow, "Building..."))
+	l.Info(l.msg(yellow, "Building..."))
 }
 
 func (l *Log) Info(msg string) {
-	l.Infof(l.msg(blue, msg))
+	l.Logger.Info(l.msg(blue, msg))
 }
 
 func (l *Log) Error(v interface{}) {
-	l.Infof(l.msg(red, fmt.Sprint(v)))
+	l.Info(l.msg(red, fmt.Sprint(v)))
 }
 
 func (l *Log) msg(code int, msg string) string {
-	return fmt.Sprintf("\033[%dm%s\033[0m", code, fmt.Sprintf("%s: %s", "Watcher", msg))
+	return fmt.Sprintf("\033[%dm%s\033[0m", code, fmt.Sprintf("%s: %s", "Fresher Watch", msg))
 }
 
 func init() {
 	log = &Log{
 		Logger: logrus.New(),
 	}
+	formatter := new(logrus.TextFormatter)
+	formatter.ForceColors = true
+	log.SetFormatter(formatter)
 }
