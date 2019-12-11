@@ -1,8 +1,19 @@
 build:
-  os: darwin
+  env:
+    - GOOS=linux
   target: main.go
-  exec_location: 
-
+  output: /tmp/app
+  without_run: true
+  before:
+    - echo Before Build      hook
+  after:
+    - docker cp /tmp/app container:/tmp/app
+    - name: docker
+      arg:
+        - exec
+        - container
+        - /tmp/app
+      async: true
 path:
   - .
   - name: no_exists_dir
