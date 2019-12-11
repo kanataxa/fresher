@@ -6,9 +6,9 @@ import (
 
 type OptionFunc func(f *Fresher)
 
-func ExecTarget(target string) OptionFunc {
+func ExecTarget(bc *BuildConfig) OptionFunc {
 	return func(f *Fresher) {
-		f.opt.target = target
+		f.opt.build = bc
 	}
 }
 

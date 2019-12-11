@@ -5,15 +5,13 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
 )
 
 type Option struct {
-	target        string
+	build         *BuildConfig
 	configs       []*WatcherConfig
 	globalExclude *GlobalExclude
 	exts          Extensions
@@ -22,7 +20,9 @@ type Option struct {
 
 func defaultOption() *Option {
 	return &Option{
-		target: "main.go",
+		build: &BuildConfig{
+			Target: "main.go",
+		},
 		configs: []*WatcherConfig{
 			{
 				Name: ".",
@@ -113,8 +113,7 @@ func (f *Fresher) publish(watcher *fsnotify.Watcher, watcherPath *WatcherPath) {
 }
 
 func (f *Fresher) buildTarget() error {
-	cmd := exec.Command("go", "build", "-o", filepath.Join(os.TempDir(), "fresher_run"), f.opt.target)
-
+	cmd := f.opt.build.BuildCommand()
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
 		return err
@@ -138,7 +137,7 @@ func (f *Fresher) run() error {
 	if err := f.buildTarget(); err != nil {
 		return err
 	}
-	cmd := exec.Command(filepath.Join(os.TempDir(), "fresher_run"))
+	cmd := f.opt.build.RunCommand()
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
 		return err
@@ -159,7 +158,7 @@ func (f *Fresher) run() error {
 
 	go func() {
 		<-f.rebuild
-		log.Info("Kill Process")
+		log.Info("Kill Exec Process")
 		cmd.Process.Kill()
 	}()
 
