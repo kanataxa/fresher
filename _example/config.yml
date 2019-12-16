@@ -1,4 +1,6 @@
 build:
+  host:
+    docker: container
   env:
     - GOOS=linux
   target: main.go

@@ -7,7 +7,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-
 	"strings"
 	"time"
 
@@ -24,6 +23,7 @@ type Config struct {
 
 type BuildConfig struct {
 	Target         string     `yaml:"target"`
+	Host           *Host      `yaml:"host"`
 	Output         string     `yaml:"output"`
 	Environ        []string   `yaml:"env"`
 	Arg            []string   `yaml:"arg"`
@@ -62,23 +62,31 @@ func (bc *BuildConfig) buildArg() []string {
 	return arg
 }
 
-func (bc *BuildConfig) Commands() []*Command {
-	commands := []*Command{
+func (bc *BuildConfig) Commands() []Executor {
+	commands := []Executor{
 		bc.BuildCommand(),
 	}
 	if cmd := bc.RunCommand(); cmd != nil {
 		commands = append(commands, cmd)
 	}
 	if len(bc.BeforeCommands) > 0 {
-		commands = append(append([]*Command{}, bc.BeforeCommands...), commands...)
+		cmds := make([]Executor, len(bc.BeforeCommands))
+		for idx, cmd := range bc.BeforeCommands {
+			cmds[idx] = cmd
+		}
+		commands = append(cmds, commands...)
 	}
 	if len(bc.AfterCommands) > 0 {
-		commands = append(commands, bc.AfterCommands...)
+		cmds := make([]Executor, len(bc.AfterCommands))
+		for idx, cmd := range bc.AfterCommands {
+			cmds[idx] = cmd
+		}
+		commands = append(commands, cmds...)
 	}
 	return commands
 }
 
-func (bc *BuildConfig) BuildCommand() *Command {
+func (bc *BuildConfig) BuildCommand() Executor {
 	cmd := exec.Command("go", bc.buildArg()...)
 	cmd.Env = append(os.Environ(), bc.Environ...)
 	return &Command{
@@ -89,19 +97,23 @@ func (bc *BuildConfig) BuildCommand() *Command {
 	}
 }
 
-func (bc *BuildConfig) RunCommand() *Command {
+func (bc *BuildConfig) RunCommand() Executor {
 	if bc.WithoutRun {
 		return nil
 	}
-	return &Command{
-		Name:    bc.runBinaryPath(),
-		IsAsync: true,
+	if bc.Host == nil {
+		return &Command{
+			Name:    bc.runBinaryPath(),
+			IsAsync: true,
+		}
 	}
+	return bc.Host.RunCommand(bc.runBinaryPath())
 }
 
 func (bc *BuildConfig) UnmarshalYAML(b []byte) error {
 	st := struct {
 		Target         string     `yaml:"target"`
+		Host           *Host      `yaml:"host"`
 		Output         string     `yaml:"output"`
 		Environ        []string   `yaml:"env"`
 		Arg            []string   `yaml:"arg"`
@@ -118,6 +130,7 @@ func (bc *BuildConfig) UnmarshalYAML(b []byte) error {
 		return nil
 	}
 	bc.Target = st.Target
+	bc.Host = st.Host
 	bc.Output = st.Output
 	bc.Environ = st.Environ
 	bc.Arg = st.Arg
