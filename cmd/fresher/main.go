@@ -1,20 +1,24 @@
 package main
 
 import (
-	"log"
+	"os"
 
 	"github.com/jessevdk/go-flags"
 	"github.com/kanataxa/fresher"
 )
 
 type Option struct {
-	Config string `long:"config" short:"c" default:"fresher.yaml" description:"config yaml file name"`
+	Start StartCommand `description:"start fresher and watch files" command:"start"`
 }
 
 var opts Option
 
-func run() error {
-	c, err := fresher.LoadConfig(opts.Config)
+type StartCommand struct {
+	Config string `long:"config" short:"c" default:"fresher.yaml" description:"config yaml file name"`
+}
+
+func (s *StartCommand) Execute(args []string) error {
+	c, err := fresher.LoadConfig(s.Config)
 	if err != nil {
 		return err
 	}
@@ -32,9 +36,8 @@ func main() {
 			if e.Type == flags.ErrHelp {
 				return
 			}
+			parser.WriteHelp(os.Stdout)
 		}
 	}
-	if err := run(); err != nil {
-		log.Fatal(err)
-	}
+
 }
