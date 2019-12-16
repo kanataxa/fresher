@@ -142,7 +142,6 @@ func (bc *BuildConfig) UnmarshalYAML(b []byte) error {
 		bc.Target = target
 		return nil
 	}
-	fmt.Println(st.Environ)
 	bc.Target = st.Target
 	bc.Host = st.Host
 	bc.Output = st.Output
