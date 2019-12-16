@@ -41,11 +41,11 @@ func (h *Host) UnmarshalYAML(b []byte) error {
 	return nil
 }
 
-func (h *Host) RunCommands(path string) []*Command {
+func (h *Host) RunCommands(path string) []Executor {
 	switch h.Type {
 	case HostTypeDocker:
-		return []*Command{
-			{
+		return []Executor{
+			&Command{
 				Name: "docker",
 				Arg: []string{
 					"cp",
@@ -53,7 +53,7 @@ func (h *Host) RunCommands(path string) []*Command {
 					fmt.Sprintf("%s:%s", h.LocationName, path),
 				},
 			},
-			{
+			&Command{
 				Name: "docker",
 				Arg: []string{
 					"exec",
@@ -64,8 +64,8 @@ func (h *Host) RunCommands(path string) []*Command {
 			},
 		}
 	default:
-		return []*Command{
-			{
+		return []Executor{
+			&Command{
 				Name:    path,
 				IsAsync: true,
 			},

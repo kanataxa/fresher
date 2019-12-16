@@ -63,23 +63,31 @@ func (bc *BuildConfig) buildArg() []string {
 	return arg
 }
 
-func (bc *BuildConfig) Commands() []*Command {
-	commands := []*Command{
+func (bc *BuildConfig) Commands() []Executor {
+	commands := []Executor{
 		bc.BuildCommand(),
 	}
 	if cmds := bc.RunCommands(); len(cmds) > 0 {
 		commands = append(commands, cmds...)
 	}
 	if len(bc.BeforeCommands) > 0 {
-		commands = append(append([]*Command{}, bc.BeforeCommands...), commands...)
+		cmds := make([]Executor, len(bc.BeforeCommands))
+		for idx, cmd := range bc.BeforeCommands {
+			cmds[idx] = cmd
+		}
+		commands = append(cmds, commands...)
 	}
 	if len(bc.AfterCommands) > 0 {
-		commands = append(commands, bc.AfterCommands...)
+		cmds := make([]Executor, len(bc.AfterCommands))
+		for idx, cmd := range bc.AfterCommands {
+			cmds[idx] = cmd
+		}
+		commands = append(commands, cmds...)
 	}
 	return commands
 }
 
-func (bc *BuildConfig) BuildCommand() *Command {
+func (bc *BuildConfig) BuildCommand() Executor {
 	cmd := exec.Command("go", bc.buildArg()...)
 	cmd.Env = append(os.Environ(), bc.Environ...)
 	return &Command{
@@ -90,13 +98,13 @@ func (bc *BuildConfig) BuildCommand() *Command {
 	}
 }
 
-func (bc *BuildConfig) RunCommands() []*Command {
+func (bc *BuildConfig) RunCommands() []Executor {
 	if bc.WithoutRun {
 		return nil
 	}
 	if bc.Host == nil {
-		return []*Command{
-			{
+		return []Executor{
+			&Command{
 				Name:    bc.runBinaryPath(),
 				IsAsync: true,
 			},

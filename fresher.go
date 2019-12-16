@@ -3,6 +3,7 @@ package fresher
 import (
 	"fmt"
 	"os"
+	"os/signal"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -57,8 +58,15 @@ func (f *Fresher) Watch() error {
 	}
 	defer watcher.Close()
 
-	done := make(chan bool)
-	defer close(done)
+	done := make(chan struct{})
+	go func() {
+		quit := make(chan os.Signal)
+		signal.Notify(quit, os.Interrupt)
+		<-quit
+		f.rebuild <- true
+		close(quit)
+		close(done)
+	}()
 
 	if err := f.run(); err != nil {
 		log.Error(fmt.Errorf("failed to build: %v\n", err))
@@ -77,6 +85,7 @@ func (f *Fresher) Watch() error {
 	go f.subscribe()
 
 	<-done
+
 	return nil
 }
 
@@ -112,23 +121,16 @@ func (f *Fresher) publish(watcher *fsnotify.Watcher, watcherPath *WatcherPath) {
 
 func (f *Fresher) run() error {
 	log.Building()
-	procs := []*os.Process{}
-	for _, cmd := range f.opt.build.Commands() {
-		proc, err := cmd.Exec()
-		if err != nil {
+	commands := f.opt.build.Commands()
+	for _, cmd := range commands{
+		if err := cmd.Exec(); err != nil {
 			return err
 		}
-		if proc == nil {
-			continue
-		}
-		log.Info(fmt.Sprintf("Run Process [%d]", proc.Pid))
-		procs = append(procs, proc)
 	}
 	go func() {
 		<-f.rebuild
-		for _, proc := range procs {
-			log.Info(fmt.Sprintf("Kill Exec Process [%d]", proc.Pid))
-			proc.Kill()
+		for _, cmd := range commands {
+			cmd.Kill()
 		}
 	}()
 	return nil

@@ -11,11 +11,22 @@ import (
 	"github.com/goccy/go-yaml"
 )
 
+type Executor interface {
+	Exec() error
+	Kill() error
+}
+
+type DockerCommand struct {
+	*Command
+	binPath string
+}
+
 type Command struct {
 	Name    string
 	Arg     []string
 	Environ []string
 	IsAsync bool
+	proc    *os.Process
 }
 
 func (c *Command) UnmarshalYAML(b []byte) error {
@@ -57,18 +68,29 @@ func (c *Command) build() *exec.Cmd {
 	return cmd
 }
 
-func (c *Command) Exec() (*os.Process, error) {
+func (c *Command) Exec() error {
 	if !c.IsAsync {
 		if err := c.runSync(); err != nil {
-			return nil, err
+			return err
 		}
-		return nil, nil
+		return nil
 	}
-	p, err := c.runAsync()
-	if err != nil {
-		return nil, err
+
+	if err := c.runAsync(); err != nil {
+		return err
 	}
-	return p, nil
+	return nil
+}
+
+func (c *Command) Kill() error {
+	if c.proc == nil {
+		return nil
+	}
+	log.Info(fmt.Sprintf("Kill Exec Process [%d]", c.proc.Pid))
+	if err := c.proc.Kill(); err != nil {
+		return nil
+	}
+	return nil
 }
 
 func (c *Command) runSync() error {
@@ -95,28 +117,31 @@ func (c *Command) runSync() error {
 		log.Error(string(errBuf))
 		return fmt.Errorf("failed to build: [%s]", string(errBuf))
 	}
+	log.Info(fmt.Sprintf("Run Process [%d]", cmd.Process.Pid))
 	return nil
 }
 
-func (c *Command) runAsync() (*os.Process, error) {
+func (c *Command) runAsync() error {
 	cmd := c.build()
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	log.Info("Waiting...")
 	if err := cmd.Start(); err != nil {
-		return nil, err
+		return err
 	}
 
 	go io.Copy(os.Stdout, stdout)
 	go io.Copy(os.Stderr, stderr)
 
-	return cmd.Process, nil
+	c.proc = cmd.Process
+	log.Info(fmt.Sprintf("Run Process [%d]", cmd.Process.Pid))
+	return nil
 }
