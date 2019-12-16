@@ -2,20 +2,13 @@ build:
   host:
     docker: container
   env:
-    - GOOS=linux
+    GOOS: linux
   target: main.go
   output: /tmp/app
-  without_run: true
   before:
     - echo Before Build      hook
   after:
-    - docker cp /tmp/app container:/tmp/app
-    - name: docker
-      arg:
-        - exec
-        - container
-        - /tmp/app
-      async: true
+    - echo After Callback
 path:
   - .
   - name: no_exists_dir
