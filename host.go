@@ -1,8 +1,6 @@
 package fresher
 
 import (
-	"fmt"
-
 	"github.com/goccy/go-yaml"
 )
 
@@ -11,6 +9,10 @@ type hostType int
 const (
 	HostTypeLocal = iota
 	HostTypeDocker
+)
+
+const (
+	hostNameDocker = "docker"
 )
 
 func (h hostType) String() string {
@@ -28,32 +30,31 @@ type Host struct {
 }
 
 func (h *Host) UnmarshalYAML(b []byte) error {
-	st := struct {
-		Docker string `yaml:"docker"`
-	}{}
-	if err := yaml.Unmarshal(b, &st); err != nil {
+	m := make(map[string]string)
+	if err := yaml.Unmarshal(b, &m); err != nil {
 		return err
 	}
-	if st.Docker != "" {
-		h.Type = HostTypeDocker
-		h.LocationName = st.Docker
+	for host, location := range m {
+		h.Type = toHostType(host)
+		h.LocationName = location
+		break
 	}
 	return nil
 }
 
-func (h *Host) RunCommands(path string) []Executor {
+func toHostType(host string) hostType {
+	switch host {
+	case hostNameDocker:
+		return HostTypeDocker
+	}
+	return HostTypeLocal
+}
+
+func (h *Host) RunCommand(path string) Executor {
 	switch h.Type {
 	case HostTypeDocker:
-		return []Executor{
-			&Command{
-				Name: "docker",
-				Arg: []string{
-					"cp",
-					path,
-					fmt.Sprintf("%s:%s", h.LocationName, path),
-				},
-			},
-			&Command{
+		return &DockerCommand{
+			Command: &Command{
 				Name: "docker",
 				Arg: []string{
 					"exec",
@@ -62,13 +63,13 @@ func (h *Host) RunCommands(path string) []Executor {
 				},
 				IsAsync: true,
 			},
+			binPath: path,
+			host:    h,
 		}
 	default:
-		return []Executor{
-			&Command{
-				Name:    path,
-				IsAsync: true,
-			},
+		return &Command{
+			Name:    path,
+			IsAsync: true,
 		}
 	}
 

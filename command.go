@@ -19,6 +19,48 @@ type Executor interface {
 type DockerCommand struct {
 	*Command
 	binPath string
+	host    *Host
+}
+
+func (c *DockerCommand) copyToContainer() error {
+	cmd := &Command{
+		Name: "docker",
+		Arg:  []string{"cp", c.binPath, fmt.Sprintf("%s:%s", c.host.LocationName, c.binPath)},
+	}
+	return cmd.Exec()
+}
+
+func (c *DockerCommand) Exec() error {
+	if err := c.copyToContainer(); err != nil {
+		return err
+	}
+	if err := c.Command.Exec(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *DockerCommand) Kill() error {
+	pidCommand := &Command{
+		Name: "docker",
+		Arg:  []string{"exec", c.host.LocationName, "pidof", "-s", c.binPath},
+	}
+	pid, err := pidCommand.build().Output()
+	if err != nil {
+		return err
+	}
+	cmd := &Command{
+		Name: "docker",
+		Arg:  []string{"exec", c.host.LocationName, "kill", "-9", strings.Split(string(pid), "\n")[0]},
+	}
+	log.Info(fmt.Sprintf("Kill Exec Process Inside Docker [%d]", c.proc.Pid))
+	if err := cmd.Exec(); err != nil {
+		return err
+	}
+	if err := c.Command.Kill(); err != nil {
+		return err
+	}
+	return nil
 }
 
 type Command struct {

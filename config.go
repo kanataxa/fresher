@@ -7,7 +7,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-
 	"strings"
 	"time"
 
@@ -67,8 +66,8 @@ func (bc *BuildConfig) Commands() []Executor {
 	commands := []Executor{
 		bc.BuildCommand(),
 	}
-	if cmds := bc.RunCommands(); len(cmds) > 0 {
-		commands = append(commands, cmds...)
+	if cmd := bc.RunCommand(); cmd != nil {
+		commands = append(commands, cmd)
 	}
 	if len(bc.BeforeCommands) > 0 {
 		cmds := make([]Executor, len(bc.BeforeCommands))
@@ -98,19 +97,17 @@ func (bc *BuildConfig) BuildCommand() Executor {
 	}
 }
 
-func (bc *BuildConfig) RunCommands() []Executor {
+func (bc *BuildConfig) RunCommand() Executor {
 	if bc.WithoutRun {
 		return nil
 	}
 	if bc.Host == nil {
-		return []Executor{
-			&Command{
-				Name:    bc.runBinaryPath(),
-				IsAsync: true,
-			},
+		return &Command{
+			Name:    bc.runBinaryPath(),
+			IsAsync: true,
 		}
 	}
-	return bc.Host.RunCommands(bc.runBinaryPath())
+	return bc.Host.RunCommand(bc.runBinaryPath())
 }
 
 func (bc *BuildConfig) UnmarshalYAML(b []byte) error {
