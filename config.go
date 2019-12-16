@@ -25,7 +25,7 @@ type BuildConfig struct {
 	Target         string     `yaml:"target"`
 	Host           *Host      `yaml:"host"`
 	Output         string     `yaml:"output"`
-	Environ        []string   `yaml:"env"`
+	Environ        Environ    `yaml:"env"`
 	Arg            []string   `yaml:"arg"`
 	WithoutRun     bool       `yaml:"without_run"`
 	BeforeCommands []*Command `yaml:"before"`
@@ -110,12 +110,25 @@ func (bc *BuildConfig) RunCommand() Executor {
 	return bc.Host.RunCommand(bc.runBinaryPath())
 }
 
+type Environ []string
+
+func (e *Environ) UnmarshalYAML(b []byte) error {
+	m := make(map[string]string)
+	if err := yaml.Unmarshal(b, &m); err != nil {
+		return err
+	}
+	for k, v := range m {
+		*e = append(*e, fmt.Sprintf("%s=%s", k, v))
+	}
+	return nil
+}
+
 func (bc *BuildConfig) UnmarshalYAML(b []byte) error {
 	st := struct {
 		Target         string     `yaml:"target"`
 		Host           *Host      `yaml:"host"`
 		Output         string     `yaml:"output"`
-		Environ        []string   `yaml:"env"`
+		Environ        Environ    `yaml:"env"`
 		Arg            []string   `yaml:"arg"`
 		WithoutRun     bool       `yaml:"without_run"`
 		BeforeCommands []*Command `yaml:"before"`
@@ -129,6 +142,7 @@ func (bc *BuildConfig) UnmarshalYAML(b []byte) error {
 		bc.Target = target
 		return nil
 	}
+	fmt.Println(st.Environ)
 	bc.Target = st.Target
 	bc.Host = st.Host
 	bc.Output = st.Output
