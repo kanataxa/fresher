@@ -24,6 +24,7 @@ type Config struct {
 
 type BuildConfig struct {
 	Target         string     `yaml:"target"`
+	Host           *Host      `yaml:"host"`
 	Output         string     `yaml:"output"`
 	Environ        []string   `yaml:"env"`
 	Arg            []string   `yaml:"arg"`
@@ -66,8 +67,8 @@ func (bc *BuildConfig) Commands() []*Command {
 	commands := []*Command{
 		bc.BuildCommand(),
 	}
-	if cmd := bc.RunCommand(); cmd != nil {
-		commands = append(commands, cmd)
+	if cmds := bc.RunCommands(); len(cmds) > 0 {
+		commands = append(commands, cmds...)
 	}
 	if len(bc.BeforeCommands) > 0 {
 		commands = append(append([]*Command{}, bc.BeforeCommands...), commands...)
@@ -89,19 +90,25 @@ func (bc *BuildConfig) BuildCommand() *Command {
 	}
 }
 
-func (bc *BuildConfig) RunCommand() *Command {
+func (bc *BuildConfig) RunCommands() []*Command {
 	if bc.WithoutRun {
 		return nil
 	}
-	return &Command{
-		Name:    bc.runBinaryPath(),
-		IsAsync: true,
+	if bc.Host == nil {
+		return []*Command{
+			{
+				Name:    bc.runBinaryPath(),
+				IsAsync: true,
+			},
+		}
 	}
+	return bc.Host.RunCommands(bc.runBinaryPath())
 }
 
 func (bc *BuildConfig) UnmarshalYAML(b []byte) error {
 	st := struct {
 		Target         string     `yaml:"target"`
+		Host           *Host      `yaml:"host"`
 		Output         string     `yaml:"output"`
 		Environ        []string   `yaml:"env"`
 		Arg            []string   `yaml:"arg"`
@@ -118,6 +125,7 @@ func (bc *BuildConfig) UnmarshalYAML(b []byte) error {
 		return nil
 	}
 	bc.Target = st.Target
+	bc.Host = st.Host
 	bc.Output = st.Output
 	bc.Environ = st.Environ
 	bc.Arg = st.Arg
