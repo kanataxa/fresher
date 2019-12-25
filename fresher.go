@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"sync"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -37,6 +38,7 @@ type Fresher struct {
 	event   chan fsnotify.Event
 	rebuild chan bool
 	timer   *time.Timer
+	mu      *sync.Mutex
 }
 
 func New(fns ...OptionFunc) *Fresher {
@@ -44,6 +46,7 @@ func New(fns ...OptionFunc) *Fresher {
 		opt:     defaultOption(),
 		event:   make(chan fsnotify.Event, 1),
 		rebuild: make(chan bool, 1),
+		mu:      new(sync.Mutex),
 	}
 	for _, fn := range fns {
 		fn(fr)
@@ -124,7 +127,7 @@ func (f *Fresher) publish(watcher *fsnotify.Watcher, watcherPath *WatcherPath) {
 func (f *Fresher) run() error {
 	log.Building()
 	commands := f.opt.build.Commands()
-	for _, cmd := range commands{
+	for _, cmd := range commands {
 		if err := cmd.Exec(); err != nil {
 			return err
 		}
@@ -139,25 +142,28 @@ func (f *Fresher) run() error {
 }
 
 func (f *Fresher) reserve() error {
-	event := <-f.event
-	log.UpdateFile(event.Name)
+	timer := time.NewTimer(f.opt.interval)
+	f.mu.Lock()
 	if f.timer == nil || f.timer.Stop() {
-		f.timer = time.NewTimer(f.opt.interval)
+		f.timer = timer
 	} else {
 		f.timer.Reset(f.opt.interval)
 	}
-	go func() {
-		<-f.timer.C
+	f.mu.Unlock()
+	go func(t *time.Timer) {
+		<-t.C
 		f.rebuild <- true
 		if err := f.run(); err != nil {
 			log.Error(err)
 			return
 		}
-	}()
+	}(timer)
 	return nil
 }
 func (f *Fresher) subscribe() {
 	for {
+		event := <-f.event
+		log.UpdateFile(event.Name)
 		if err := f.reserve(); err != nil {
 			log.Println(err)
 		}
