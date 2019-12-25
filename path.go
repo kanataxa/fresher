@@ -232,6 +232,10 @@ func (w *WatcherPath) Merge(wp *WatcherPath) {
 	}
 }
 
+var (
+	skipToAddErr = fmt.Errorf("does not need to add file")
+)
+
 func (w *WatcherPath) AddIfNeeds(path string, watcher *fsnotify.Watcher) error {
 	if strings.Contains(path, "tmp___") {
 		return nil
@@ -240,10 +244,10 @@ func (w *WatcherPath) AddIfNeeds(path string, watcher *fsnotify.Watcher) error {
 		return nil
 	}
 	if _, exists := w.ignores[path]; exists {
-		return nil
+		return skipToAddErr
 	}
 	if _, exists := w.watches[path]; exists {
-		return nil
+		return skipToAddErr
 	}
 	for _, wc := range w.wcs {
 		shouldWatch, err := wc.ShouldWatchFile(path, w.opt)
@@ -261,5 +265,5 @@ func (w *WatcherPath) AddIfNeeds(path string, watcher *fsnotify.Watcher) error {
 	}
 	log.IgnoreFile(path)
 	w.ignores[path] = struct{}{}
-	return nil
+	return skipToAddErr
 }
