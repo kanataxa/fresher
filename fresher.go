@@ -33,15 +33,16 @@ func defaultOption() *Option {
 }
 
 type Fresher struct {
-	opt         *Option
-	event       *fsnotify.Event
-	latestEvent *fsnotify.Event
-	rebuild     chan bool
+	opt     *Option
+	event   chan fsnotify.Event
+	rebuild chan bool
+	timer   *time.Timer
 }
 
 func New(fns ...OptionFunc) *Fresher {
 	fr := &Fresher{
 		opt:     defaultOption(),
+		event:   make(chan fsnotify.Event, 1),
 		rebuild: make(chan bool, 1),
 	}
 	for _, fn := range fns {
@@ -101,15 +102,16 @@ func (f *Fresher) publish(watcher *fsnotify.Watcher, watcherPath *WatcherPath) {
 			}
 			if event.Op&fsnotify.Create == fsnotify.Create {
 				if err := watcherPath.AddIfNeeds(event.Name, watcher); err != nil {
-					log.Error(err)
+					if err != skipToAddErr {
+						log.Error(err)
+					}
 					continue
 				}
 			}
 			if _, exists := watcherPath.watches[event.Name]; !exists {
 				continue
 			}
-			log.UpdateFile(event.Name)
-			f.event = &event
+			f.event <- event
 		case err, ok := <-watcher.Errors:
 			if !ok {
 				continue
@@ -136,30 +138,27 @@ func (f *Fresher) run() error {
 	return nil
 }
 
-func (f *Fresher) build() error {
-	event := f.event
-	defer func() {
-		time.Sleep(f.opt.interval)
+func (f *Fresher) reserve() error {
+	event := <-f.event
+	log.UpdateFile(event.Name)
+	if f.timer == nil || f.timer.Stop() {
+		f.timer = time.NewTimer(f.opt.interval)
+	} else {
+		f.timer.Reset(f.opt.interval)
+	}
+	go func() {
+		<-f.timer.C
+		f.rebuild <- true
+		if err := f.run(); err != nil {
+			log.Error(err)
+			return
+		}
 	}()
-	if event == nil {
-		return nil
-	}
-	if event == f.latestEvent {
-		return nil
-	}
-	defer func() {
-		f.latestEvent = event
-	}()
-	f.rebuild <- true
-	if err := f.run(); err != nil {
-		return err
-	}
 	return nil
 }
-
 func (f *Fresher) subscribe() {
 	for {
-		if err := f.build(); err != nil {
+		if err := f.reserve(); err != nil {
 			log.Println(err)
 		}
 	}
