@@ -142,22 +142,19 @@ func (f *Fresher) run() error {
 }
 
 func (f *Fresher) reserve() error {
-	timer := time.NewTimer(f.opt.interval)
-	f.mu.Lock()
-	if f.timer == nil || f.timer.Stop() {
-		f.timer = timer
-	} else {
-		f.timer.Reset(f.opt.interval)
-	}
-	f.mu.Unlock()
-	go func(t *time.Timer) {
-		<-t.C
+	timer := time.AfterFunc(f.opt.interval, func() {
 		f.rebuild <- true
 		if err := f.run(); err != nil {
 			log.Error(err)
 			return
 		}
-	}(timer)
+	})
+	f.mu.Lock()
+	if f.timer != nil {
+		f.timer.Stop()
+	}
+	f.timer = timer
+	f.mu.Unlock()
 	return nil
 }
 func (f *Fresher) subscribe() {
