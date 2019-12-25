@@ -1,6 +1,7 @@
 package fresher
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -13,6 +14,7 @@ import (
 
 type Executor interface {
 	Exec() error
+	ExecContext(context.Context) error
 	Kill() error
 }
 
@@ -22,19 +24,26 @@ type DockerCommand struct {
 	host    *Host
 }
 
-func (c *DockerCommand) copyToContainer() error {
+func (c *DockerCommand) copyToContainer(ctx context.Context) error {
 	cmd := &Command{
 		Name: "docker",
 		Arg:  []string{"cp", c.binPath, fmt.Sprintf("%s:%s", c.host.LocationName, c.binPath)},
 	}
-	return cmd.Exec()
+	return cmd.ExecContext(ctx)
+}
+
+func (c *DockerCommand) ExecContext(ctx context.Context) error {
+	if err := c.copyToContainer(ctx); err != nil {
+		return err
+	}
+	if err := c.Command.ExecContext(ctx); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (c *DockerCommand) Exec() error {
-	if err := c.copyToContainer(); err != nil {
-		return err
-	}
-	if err := c.Command.Exec(); err != nil {
+	if err := c.ExecContext(context.Background()); err != nil {
 		return err
 	}
 	return nil
@@ -45,7 +54,7 @@ func (c *DockerCommand) Kill() error {
 		Name: "docker",
 		Arg:  []string{"exec", c.host.LocationName, "pidof", "-s", c.binPath},
 	}
-	pid, err := pidCommand.build().Output()
+	pid, err := pidCommand.build(context.Background()).Output()
 	if err != nil {
 		return err
 	}
@@ -104,21 +113,28 @@ func (c *Command) UnmarshalYAML(b []byte) error {
 	return nil
 }
 
-func (c *Command) build() *exec.Cmd {
-	cmd := exec.Command(c.Name, c.Arg...)
+func (c *Command) build(ctx context.Context) *exec.Cmd {
+	cmd := exec.CommandContext(ctx, c.Name, c.Arg...)
 	cmd.Env = c.Environ
 	return cmd
 }
 
-func (c *Command) Exec() error {
+func (c *Command) ExecContext(ctx context.Context) error {
 	if !c.IsAsync {
-		if err := c.runSync(); err != nil {
+		if err := c.runSync(ctx); err != nil {
 			return err
 		}
 		return nil
 	}
 
-	if err := c.runAsync(); err != nil {
+	if err := c.runAsync(ctx); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *Command) Exec() error {
+	if err := c.ExecContext(context.Background()); err != nil {
 		return err
 	}
 	return nil
@@ -135,8 +151,8 @@ func (c *Command) Kill() error {
 	return nil
 }
 
-func (c *Command) runSync() error {
-	cmd := c.build()
+func (c *Command) runSync(ctx context.Context) error {
+	cmd := c.build(ctx)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return err
@@ -163,8 +179,8 @@ func (c *Command) runSync() error {
 	return nil
 }
 
-func (c *Command) runAsync() error {
-	cmd := c.build()
+func (c *Command) runAsync(ctx context.Context) error {
+	cmd := c.build(ctx)
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
 		return err
