@@ -1,6 +1,7 @@
 package fresher
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -127,13 +128,19 @@ func (f *Fresher) publish(watcher *fsnotify.Watcher, watcherPath *WatcherPath) {
 func (f *Fresher) run() error {
 	log.Building()
 	commands := f.opt.build.Commands()
+	ctx, cancel := context.WithCancel(context.Background())
 	for _, cmd := range commands {
-		if err := cmd.Exec(); err != nil {
+		if err := cmd.ExecContext(ctx); err != nil {
 			return err
 		}
 	}
 	go func() {
 		<-f.rebuild
+		select {
+		case <-ctx.Done():
+		default:
+			cancel()
+		}
 		for _, cmd := range commands {
 			cmd.Kill()
 		}
