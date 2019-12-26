@@ -136,11 +136,7 @@ func (f *Fresher) run() error {
 	}
 	go func() {
 		<-f.rebuild
-		select {
-		case <-ctx.Done():
-		default:
-			cancel()
-		}
+		cancel()
 		for _, cmd := range commands {
 			cmd.Kill()
 		}
