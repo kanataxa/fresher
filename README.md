@@ -1,4 +1,6 @@
 # fresher
+※ Click [here](https://github.com/kanataxa/fresher/blob/master/README.ja.md) for the Japanese version
+
 
 `fresher` is a hot reload tool that restarts the Go application when the group of monitored files changes.
 
