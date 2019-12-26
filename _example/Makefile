@@ -1,2 +1,3 @@
 .PHONY: start
-start: fresher -c ./config.yml
+start:
+	fresher start -c ./config.yml
