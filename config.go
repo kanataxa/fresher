@@ -123,16 +123,47 @@ func (e *Environ) UnmarshalYAML(b []byte) error {
 	return nil
 }
 
+type ArgDecoder struct {
+	arg []string
+}
+
+type ArgDecoders []*ArgDecoder
+
+func (a ArgDecoders) Argument() []string {
+	var arg []string
+	for _, dec := range a {
+		arg = append(arg, dec.arg...)
+	}
+	return arg
+}
+
+func (a *ArgDecoder) UnmarshalYAML(b []byte) error {
+	fmt.Println(string(b))
+	m := make(map[string]string)
+	if err := yaml.Unmarshal(b, &m); err != nil {
+		var s string
+		if err := yaml.Unmarshal(b, &s); err != nil {
+			return err
+		}
+		a.arg = append(a.arg, s)
+		return nil
+	}
+	for k, v := range m {
+		a.arg = append(a.arg, k, v)
+	}
+	return nil
+}
+
 func (bc *BuildConfig) UnmarshalYAML(b []byte) error {
 	st := struct {
-		Target         string     `yaml:"target"`
-		Host           *Host      `yaml:"host"`
-		Output         string     `yaml:"output"`
-		Environ        Environ    `yaml:"env"`
-		Arg            []string   `yaml:"arg"`
-		WithoutRun     bool       `yaml:"without_run"`
-		BeforeCommands []*Command `yaml:"before"`
-		AfterCommands  []*Command `yaml:"after"`
+		Target         string      `yaml:"target"`
+		Host           *Host       `yaml:"host"`
+		Output         string      `yaml:"output"`
+		Environ        Environ     `yaml:"env"`
+		Arg            ArgDecoders `yaml:"arg"`
+		WithoutRun     bool        `yaml:"without_run"`
+		BeforeCommands []*Command  `yaml:"before"`
+		AfterCommands  []*Command  `yaml:"after"`
 	}{}
 	if err := yaml.Unmarshal(b, &st); err != nil {
 		var target string
@@ -146,7 +177,7 @@ func (bc *BuildConfig) UnmarshalYAML(b []byte) error {
 	bc.Host = st.Host
 	bc.Output = st.Output
 	bc.Environ = st.Environ
-	bc.Arg = st.Arg
+	bc.Arg = st.Arg.Argument()
 	bc.WithoutRun = st.WithoutRun
 	bc.BeforeCommands = st.BeforeCommands
 	bc.AfterCommands = st.AfterCommands
@@ -156,11 +187,11 @@ func (bc *BuildConfig) UnmarshalYAML(b []byte) error {
 func LoadConfig(filename string) (*Config, error) {
 	b, err := ioutil.ReadFile(filename)
 	if err != nil {
-		return nil, fmt.Errorf("fail to load yaml: %w", err)
+		return nil, err
 	}
 	var conf Config
 	if err := yaml.Unmarshal(b, &conf); err != nil {
-		return nil, fmt.Errorf("fail to unmashal yaml: %w", err)
+		return nil, err
 	}
 	return &conf, nil
 }

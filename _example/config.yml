@@ -1,10 +1,12 @@
 build:
-  host:
-    docker: container
   env:
-    GOOS: linux
+    GO111MODULE: on
   target: main.go
   output: /tmp/app
+  arg:
+    - -race
+    - -v
+    - -p: 2
   before:
     - echo Before Build      hook
   after:
