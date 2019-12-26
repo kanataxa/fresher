@@ -1,4 +1,6 @@
-# fresher
+# fresher [![Go Report Card](https://goreportcard.com/badge/github.com/kanataxa/fresher)](https://goreportcard.com/report/github.com/kanataxa/fresher) [![Actions Status](https://github.com/kanataxa/fresher/workflows/Go/badge.svg)](https://github.com/kanataxa/fresher/actions)
+
+
 ※ Click [here](https://github.com/kanataxa/fresher/blob/master/README.ja.md) for the Japanese version
 
 
